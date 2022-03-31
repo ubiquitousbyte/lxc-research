@@ -1,0 +1,91 @@
+\documentclass[chapterprefix=true, 10pt, a4paper, oneside, parskip=half, listof=totoc, bibliography=totoc, numbers=noendperiod]{scrbook}
+
+\usepackage[bottom=32mm,left=25mm,right=25mm]{geometry}
+
+\usepackage{scrhack}
+
+\usepackage{blindtext}
+
+\usepackage{caption}
+
+\usepackage{imakeidx}
+
+\usepackage{paralist}
+
+\usepackage{epigraph}
+
+\usepackage[toc, acronym]{glossaries}
+\glsenablehyper
+
+\usepackage[automark,headsepline]{scrlayer-scrpage}
+\automark{chapter}
+\ihead{\leftmark}
+\chead{}
+\ohead{\thepage}
+\ifoot*{}
+\cfoot[\thepage]{}
+\cfoot*{}
+\ofoot*{}
+\pagestyle{scrheadings}
+
+
+\usepackage[onehalfspacing]{setspace}
+
+\usepackage[stretch=10]{microtype}
+
+\usepackage[english]{babel}
+
+\usepackage{lmodern}
+\usepackage[utf8]{luainputenc}
+\usepackage[T1]{fontenc}
+
+\usepackage{epigraph}
+
+\usepackage[printonlyused]{acronym}
+
+\usepackage{float} 
+
+\usepackage{tabularx}
+
+\usepackage{longtable}
+
+\usepackage{listings}
+
+\usepackage[table,xcdraw]{xcolor}
+
+\usepackage{tikz}
+
+\usepackage{graphicx}
+
+\usepackage{wrapfig}
+
+\usepackage{subfigure}
+
+\usepackage[hidelinks,english]{hyperref}
+
+\usepackage{csquotes}
+\usepackage[style=alphabetic, backend=biber, bibencoding=utf8]{biblatex}
+\addbibresource{references/references.bib}
+
+\usepackage{amssymb}
+\usepackage{amsmath}
+
+\addtokomafont{disposition}{\rmfamily}
+
+\usepackage{verbatimbox}
+\newcommand\Includegraphics[2][]{\addvbuffer[5pt 0pt]{\includegraphics[#1]{#2}}}
+
+\renewcommand{\lstlistlistingname}{Source Code Content}
+
+\renewcommand*{\labelalphaothers}{}
+
+\renewcommand{\lstlistingname}{Code snippet}
+
+
+\newglossarystyle{dottedlocations}{%
+	\glossarystyle{list}%
+	\renewcommand*{\glossaryentryfield}[5]{%
+		\item[\glsentryitem{##1}\glstarget{##1}{##2}] \emph{##3}%
+		\unskip\leaders\hbox to 2.9mm{\hss.}\hfill##5}%
+	\renewcommand*{\glsgroupskip}{}%
+}

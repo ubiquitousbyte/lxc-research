@@ -1,0 +1,37 @@
+\makeatletter
+
+\renewcommand*{\maketitle}{
+	\begin{titlepage}
+		\newgeometry{left=2.5cm,right=2.5cm,top=2.5cm,bottom=2.5cm}
+		\begin{figure}[H]
+			\centering
+			\includegraphics[width=0.5\textwidth]{images/htw/logo}
+		\end{figure}
+		\begin{center}
+			\vfill
+			{\Large System Calls for Containerising and Managing Processes in Linux\par}
+			\vskip 0.5cm
+			{\large \bfseries A Thesis\par}
+			\vskip 0.5cm
+			{\large Submitted in Partial Fulfillment of the Requirements for the
+                    Degree of\vskip 0.5cm \bfseries Master of Science (M.Sc.) 
+                    in Applied Computer Science}
+			\vskip 0.5cm
+			{\large at the}
+			\vskip 0.5cm
+			{\large Berlin University of Applied Sciences (HTW)}
+			\vfill
+			\begin{flushleft}
+				\begin{tabular}[t]{rl}
+					First Supervisor: & Prof. Dr. Sebastian Bauer\\
+					Second Supervisor: & Dr. Michael Witt \\
+					Author: & B.Sc. Atanas Denkov \\
+					Matriculation Number: & s0559025 \\
+					Submission Date: & 12.07.2022
+				\end{tabular}
+			\end{flushleft}
+		\end{center}
+		\restoregeometry
+	\end{titlepage}
+}
+\makeatother

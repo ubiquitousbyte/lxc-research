@@ -1,0 +1,66 @@
+\include{config}
+
+% Titles Config - CHOOSE ONE SECTION for title format
+
+%% Used for titleGraduation Bachelor
+%% Based on https://ai-bachelor.htw-berlin.de/files/Stg/AI/richtlinie_ba-arbeit_ai_06_02_13.pdf
+\include{title}
+
+\makeindex[title=Index, options=-s indexstyle.ist, intoc]
+\indexsetup{level=\chapter*,toclevel=chapter}
+
+\makenoidxglossaries
+\loadglsentries{glossary.tex}
+\setacronymstyle{long-short}
+\begin{document}
+
+\pagenumbering{alph} % fix for same identifier warning, character is not show in title
+\maketitle
+
+\pagenumbering{roman}
+\include{chapters/preface} \clearpage 
+%\include{chapter/Abstract} \clearpage
+%\include{chapter/Abstract_de} \clearpage
+
+\tableofcontents \newpage
+
+\pagenumbering{arabic}
+\input{chapters/introduction} \clearpage
+\input{chapters/fundamentals} \clearpage
+%\input{chapter/Analysis} \clearpage
+%\input{chapter/Conception} \clearpage
+%\input{chapter/Implementation} \clearpage
+%\input{chapter/Test} \clearpage
+%\input{chapter/Evaluation} \clearpage
+%\input{chapter/Conclusion} \clearpage
+
+\pagenumbering{Roman}
+% List of Figures
+\listoffigures \clearpage
+% List of Tables
+\listoftables \clearpage
+% Source Code Content
+\lstlistoflistings \clearpage
+
+\printindex \clearpage
+
+\printnoidxglossary[title=Glossar] \clearpage
+
+\defbibfilter{scientific}{
+	type=article or
+	type=inbook or
+	type=book or
+	type=unpublished or
+	type=inproceedings or
+	type=incollection or
+	type=manual or
+	type=phdthesis
+}
+
+\printbibliography[heading=bibintoc, filter=scientific, title={References}]\clearpage
+\printbibliography[heading=bibintoc, keyword={online}, title={Online References}]\clearpage
+\printbibliography[heading=bibintoc, keyword={image}, title={Image References}]\clearpage
+
+
+
+\end{document}

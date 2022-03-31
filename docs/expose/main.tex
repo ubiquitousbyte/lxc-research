@@ -1,0 +1,220 @@
+% !TeX encoding = UTF-8
+% !TeX program = pdflatex
+% !BIB program = bibtex
+
+\documentclass[english]{lni}
+\usepackage[backend=biber]{biblatex}
+\usepackage{etoc}
+\usepackage[]{hyperref}
+\hypersetup{colorlinks=true, linkbordercolor=green}
+\AtBeginDocument{\hypersetup{pdfborder={0 0 1}}}
+
+\bibliography{references}
+
+\begin{document}
+\title[System Calls for Containerising and Managing Processes in Linux]
+{System Calls for Containerising and Managing Processes in Linux: 
+A Cumulative Case Study}
+
+\author[Atanas Denkov]{Atanas Denkov \footnote{\email{nasdenkov@gmail.com}}}
+
+\maketitle 
+
+\section{State of research}
+Primitive support for multiprocessing in the form of basic context switching and 
+dedicated I/O components was introduced in the late 1950s.
+Multiprocessing allowed for concurrent execution of multiple instructions but 
+also greatly increased system complexity. 
+Interleaved processes had a global unrestricted view of the system. 
+For example, nothing prevented a process from modifying memory allocated to 
+another process.
+Techniques for compartmentalisation of system resources were required, the 
+most noticable of which was the centralisation of resource allocation and 
+management in a dedicated and privileged program refered to as the kernel. 
+Parallel research was also done in other closely-related fields such as 
+virtual machines and capability-based systems - the precursor to modern 
+containers.\\
+\citeauthor{10.1145/3365199} \cite{10.1145/3365199} summarises historical 
+research contributions in virtual machines and containers 
+that take different approaches to manage the complexity of multiprocessing, 
+but all converge towards the same set of fundamental principles - 
+\textit{isolation}, \textit{portability} and \textit{performance}.\\ 
+\citeauthor{10.1145/368481.368502} \cite{10.1145/368481.368502} proposed that a 
+process has to run in a secure isolated context that prevents it from 
+interfering with other processes. In addition, the level of isolation has to be 
+sufficient enough so that the developer of a process does not have to manage its 
+interactions with every other process on the system. \\
+\citeauthor{10.1145/368481.368502} \cite{10.1145/368481.368502} also mentions
+that programs have to be portable - they must run in heterogeneous 
+environments without being modified - a need enforced by the rapid development 
+of hardware components. \\
+\citeauthor{10.1145/3365199} \cite{10.1145/3365199} defines performance as 
+the contention between the overhead associated with isolating a process 
+from its environment and the benefits of sharing resources between processes, 
+i.e fully utilising the systems' capacity. 
+\citeauthor{10.1145/3381052.3381315} \cite{10.1145/3381052.3381315} use 
+the same definition for measuring performance costs of modern 
+container runtimes as a function of the depth of the call stack for the 
+\verb|sys_write| system call when executed from inside a container. A high call
+stack, i.e multiple levels of indirection, indicates that the runtime incurs
+noticable isolation overhead. Container runtimes have been used 
+in high-performance computing clusters for running user-defined compute jobs.
+\citeauthor{10.1145/3126908.3126925} \cite{10.1145/3126908.3126925} show 
+that containers impose minimal performance penalties.\\
+A \textit{container} refers to an isolated virtual environment created by 
+a container runtime.  
+Similarly to standard processes, containers reside in userland, 
+logically above the kernel, and request resources from it 
+as per demand. A container can host one or more processes. Processes 
+in the same container share a restricted view of the systems' resources. 
+For example, every container has a dedicated network stack with its own 
+network interfaces, routing tables and packet-forwarding rules. 
+Every process in the container can access and manipulate that network stack, 
+but no process outside the container has that capability.
+A \textit{container runtime} provides the primtiives necessary to create 
+containers on a single host. The runtime directly communicates with 
+the host kernel via system calls to isolate containers from one another 
+and from the host. The programming interfaces that enable this on Linux are 
+\textit{namespaces} \cite{namespaces-man-page} and 
+\textit{seccomp-bpf} \cite{seccomp-bpf-kernel-doc}. 
+The former is a mechanism for fine-grained separation of kernel resources 
+such as file systems, networking, process identifiers, user and group 
+identifiers, memory and CPU affinities \cite{ns-in-op}. The latter is a mechanism 
+for restricting which system calls a process in a container can use, 
+i.e limiting the attack surface for an untrusted program.  
+The Open Containers Initiative \cite{oci-runtime} has developed 
+a runtime specification that standardizes the operations that a container 
+runtime needs to support. Most importantly, a container runtime must allow 
+external processes to hook into the lifecycle of a container. 
+A \textit{container daemon} uses these hooks to manage multiple containers on a 
+single host. The daemon can attach network and storage to containers, thereby 
+allowing programs to persist state and communicate with each other, respectively.
+The daemon is also heavily dependent on the host kernel.
+On Linux, a container daemon uses the netlink protocol \cite{netlink-man-page} 
+and its subsystems rtnetlink \cite{rtnetlink-man-page} 
+and netfilter to create and manage networks between containers.
+The daemon also uses the storage subsystem (overlayfs, aufs etc.) 
+of the kernel to provide different storage drivers for containers and 
+pull program binaries from external sources and run them on the host.\\
+Unlike virtual machines, containers 
+do not emulate any hardware resources. They also do not boot up complete 
+operating system images. This can be seen as both an advantage and a 
+disadvantage. 
+On one side of the spectrum, containers have a lower isolation overhead 
+than virtual machines, which allows cloud providers to condense more 
+virtual environments onto a single host. On the other side, containers 
+are not as isolated as virtual machines, 
+which makes them more vulnerable to security breaches such as those 
+described by \citeauthor{ncc-linux-conts} \cite{ncc-linux-conts} - 
+container escaping, accidental device exposure to unprivileged containers
+and so forth. \citeauthor{10.1145/3365199} \cite{10.1145/3365199} also 
+emphasizes this problem and further states that a container is unable 
+to prevent its processes from exploiting the infamous 
+Spectre \cite{Kocher2018spectre} and Meltdown \cite{Lipp2018meltdown}. 
+The \verb|seccomp-bpf| feature introduced in the Linux kernel (v3.5) partially 
+addresses this issue by allowing container daemons to explicitly whitelist 
+the system calls (and their parameters) that a container can use and thus 
+blacklist all other interactions with the kernel. Unfortunately, this approach 
+is in direct conflict with the \textit{portability} principle - 
+programs that use blacklisted system calls must be modified. 
+Googles' gVisor \cite{gvisor} adds an additional isolation boundary 
+between the host kernel and containers by implementing a substantial portion
+of the system call interface in a user-space process called Sentry. 
+Their dedicated container runtime calls out to Sentry instead of the 
+host kernel when issuing system calls. gVisor provides 
+better isolation that native containers, however, 
+\citeauthor{234857} \cite{234857} show that the performance trade-off 
+is significant. \citeauthor{246288} \cite{246288} 
+took a different approach and tried to fuse the security 
+of virtual machines with the performance of containers by replacing QEMU with a  
+custom virtual machine monitor (VMM) that abstracts over KVM.
+Their solution is called Firecracker and is the primary containerisation 
+technique in AWS cloud infrastructure. The authors measure IO throughput 
+and latency and mention that "QEMU clearly has a more optimized IO path", 
+indicating that there is still more work to be done to narrow the gap between 
+isolation and performance.   
+
+\section{Objectives}
+Chapter 1 introduces the three fundamental principles of virtualisation. 
+It also describes what containers are and why they are a feasible 
+virtualisation technique. 
+The state of research implicitly shows that the Linux kernel 
+is a critical component for enabling further advancements in virtual machine 
+and container technologies. Therefore, developers in this domain must have 
+in-depth knowledge of the abstractions that it exposes.\\
+The main objective of this master thesis is to thoroughly describe the 
+subsystems of the Linux kernel that make containers and container 
+management daemons possible. 
+Example programs showcasing the programming interfaces of these subsystems 
+will be written so that undergraduates can understand how they work, 
+how they contribute to the task of creating and managing containers, 
+and what their implications are with respect to isolation, portability and 
+performance.
+If time permits, the author will devise a questionnaire that enables readers 
+to test their knowledge after reading the thesis. The questions will be 
+ordered by difficulty in ascending order.\\ 
+The authors' hope is that the thesis will serve as a knowledge base for 
+future work done by other students in the field. 
+\section{Structure}
+\begin{itemize}
+    \item Abstract
+    \item Introduction
+    \item Fundamentals 
+    \begin{itemize}
+        \item Principles of Virtualisation 
+        \item Capabilities
+        \item System Calls 
+    \end{itemize}
+    \item Isolation
+    \begin{itemize}
+        \item Namespaces 
+        \item Seccomp 
+        \item Control Groups
+        \item Container Runtime
+    \end{itemize}
+    \item Portability 
+    \begin{itemize}
+        \item Mounts 
+        \item Container Filesystems
+        \item Images and Immutable Snapshots 
+    \end{itemize}
+    \item Resource Orchestration  
+    \begin{itemize}
+        \item Networking 
+        \item Storage
+        \item Container Daemon 
+    \end{itemize}
+    \item Reference Architectures 
+    \begin{itemize}
+        \item runc 
+        \item containerd
+    \end{itemize}
+    \item Summary
+    \item Future Directions and Challenges 
+    \item References 
+    \item Glossary 
+    \item Table of Figures 
+    \item List of Tables 
+    \item Appendix A - Source Code 
+    \item Appendix B - Questionnaire 
+\end{itemize}
+
+\section{Schedule}
+\begin{center}
+\begin{tabular}{|c|c|c|} \hline 
+\textbf{Chapter} & \textbf{Begin} & \textbf{End} \\ \hline
+Fundamentals & 03.04 & 20.04 \\ \hline 
+Isolation & 21.04 & 20.05 \\  \hline 
+Portability & 21.05 & 30.06 \\ \hline 
+Resource Orchestration & 01.07 & 01.08 \\ \hline 
+Reference Architectures & 02.08 & 19.08 \\ \hline 
+Summary & 19.08 & 20.08 \\ \hline 
+Future Directions and Challenges & 21.08 & 23.08 \\ \hline
+Questionnaire & 23.08 & 01.09 \\ \hline 
+\end{tabular}
+\end{center}
+
+\clearpage 
+\printbibliography
+
+\end{document}

@@ -1,0 +1,164 @@
+@article{10.1145/3365199,
+author = {Randal, Allison},
+title = {The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers},
+year = {2020},
+issue_date = {January 2021},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {53},
+number = {1},
+issn = {0360-0300},
+url = {https://doi.org/10.1145/3365199},
+doi = {10.1145/3365199},
+abstract = {The common perception in both academic literature and industry today is that virtual machines offer better security, whereas containers offer better performance. However, a detailed review of the history of these technologies and the current threats they face reveals a different story. This survey covers key developments in the evolution of virtual machines and containers from the 1950s to today, with an emphasis on countering modern misperceptions with accurate historical details and providing a solid foundation for ongoing research into the future of secure isolation for multitenant infrastructures, such as cloud and container deployments.},
+journal = {ACM Comput. Surv.},
+month = {feb},
+articleno = {5},
+numpages = {31},
+keywords = {virtual machines, virtualization, Containers}
+}
+
+@article{10.1145/368481.368502,
+author = {Codd, E. F. and Lowry, E. S. and McDonough, E. and Scalzi, C. A.},
+title = {Multiprogramming STRETCH: Feasibility Considerations},
+year = {1959},
+issue_date = {Nov. 1959},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {2},
+number = {11},
+issn = {0001-0782},
+url = {https://doi.org/10.1145/368481.368502},
+doi = {10.1145/368481.368502},
+journal = {Commun. ACM},
+month = {nov},
+pages = {13–17},
+numpages = {5}
+}
+
+@inproceedings{10.1145/3381052.3381315,
+author = {Anjali and Caraza-Harter, Tyler and Swift, Michael M.},
+title = {Blending Containers and Virtual Machines: A Study of Firecracker and GVisor},
+year = {2020},
+isbn = {9781450375542},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/3381052.3381315},
+doi = {10.1145/3381052.3381315},
+abstract = {With serverless computing, providers deploy application code and manage resource allocation dynamically, eliminating infrastructure management from application development.Serverless providers have a variety of virtualization platforms to choose from for isolating functions, ranging from native Linux processes to Linux containers to lightweight isolation platforms, such as Google gVisor [7] and AWS Firecracker [5]. These platforms form a spectrum as they move functionality out of the host kernel and into an isolated guest environment. For example, gVisor handles many system calls in a user-mode Sentry process while Firecracker runs a full guest operating system in each microVM. A common theme across these platforms are the twin goals of strong isolation and high performance.In this paper, we perform a comparative study of Linux containers (LXC), gVisor secure containers, and Firecracker microVMs to understand how they use Linux kernel services differently: how much does their use of host kernel functionality vary? We also evaluate the performance costs of the designs with a series of microbenchmarks targeting different kernel subsystems.Our results show that despite moving much functionality out of the kernel, both Firecracker and gVisor execute substantially more kernel code than native Linux. gVisor and Linux containers execute substantially the same code, although with different frequency.},
+booktitle = {Proceedings of the 16th ACM SIGPLAN/SIGOPS International Conference on Virtual Execution Environments},
+pages = {101–113},
+numpages = {13},
+keywords = {firecracker, serverless computing, operating systems, virtualization, gVisor, code coverage, benchmarking},
+location = {Lausanne, Switzerland},
+series = {VEE '20}
+}
+
+@inproceedings{10.1145/3126908.3126925,
+author = {Priedhorsky, Reid and Randles, Tim},
+title = {Charliecloud: Unprivileged Containers for User-Defined Software Stacks in HPC},
+year = {2017},
+isbn = {9781450351140},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/3126908.3126925},
+doi = {10.1145/3126908.3126925},
+abstract = {Supercomputing centers are seeing increasing demand for user-defined software stacks (UDSS), instead of or in addition to the stack provided by the center. These UDSS support user needs such as complex dependencies or build requirements, externally required configurations, portability, and consistency. The challenge for centers is to provide these services in a usable manner while minimizing the risks: security, support burden, missing functionality, and performance. We present Charliecloud, which uses the Linux user and mount namespaces to run industry-standard Docker containers with no privileged operations or daemons on center resources. Our simple approach avoids most security risks while maintaining access to the performance and functionality already on offer, doing so in just 800 lines of code. Charliecloud promises to bring an industry-standard UDSS user workflow to existing, minimally altered HPC resources.},
+booktitle = {Proceedings of the International Conference for High Performance Computing, Networking, Storage and Analysis},
+articleno = {36},
+numpages = {10},
+keywords = {least privilege, containers, user environments},
+location = {Denver, Colorado},
+series = {SC '17}
+}
+
+@techreport{ncc-linux-conts,
+     title = {{Understanding and Hardening Linux Containers}},
+     author = {Aaron Grattafiori},
+     group = {ncc},
+     year = {2016},
+     institution = {NCC Group},
+     month = {06},
+}
+
+@inproceedings{Lipp2018meltdown,
+ author = {Moritz Lipp and Michael Schwarz and Daniel Gruss and Thomas Prescher and Werner Haas and Anders Fogh and Jann Horn and Stefan Mangard and Paul Kocher and Daniel Genkin and Yuval Yarom and Mike Hamburg},
+ title = {Meltdown: Reading Kernel Memory from User Space},
+ booktitle = {27th {USENIX} Security Symposium ({USENIX} Security 18)},
+ year = {2018},
+}
+
+@inproceedings{Kocher2018spectre,
+ author = {Paul Kocher and Jann Horn and Anders Fogh and Daniel Genkin and Daniel Gruss and Werner Haas and Mike Hamburg and Moritz Lipp and Stefan Mangard and Thomas Prescher and Michael Schwarz and Yuval Yarom},
+ title = {Spectre Attacks: Exploiting Speculative Execution},
+ booktitle = {40th IEEE Symposium on Security and Privacy (S\&P'19)},
+ year = {2019},
+}
+
+@misc{gvisor,
+ author = {Google},
+ title = {gVisor},
+ url = { https://github.com/google/gvisor },
+}
+
+@inproceedings {234857,
+author = {Ethan G. Young and Pengfei Zhu and Tyler Caraza-Harter and Andrea C. Arpaci-Dusseau and Remzi H. Arpaci-Dusseau},
+title = {The True Cost of Containing: A {gVisor} Case Study},
+booktitle = {11th USENIX Workshop on Hot Topics in Cloud Computing (HotCloud 19)},
+year = {2019},
+address = {Renton, WA},
+url = {https://www.usenix.org/conference/hotcloud19/presentation/young},
+publisher = {USENIX Association},
+month = jul,
+}
+
+@misc{oci-runtime,
+ author = {Open Containers Initiative},
+ title = {Runtime Specification},
+ url = {https://github.com/opencontainers/runtime-spec/blob/main/spec.md},
+}
+
+@misc{ns-in-op,
+ author = {Michael Kerrisk},
+ title = {Namespaces in operation, part 1: namespaces overview},
+ url = {https://lwn.net/Articles/531114},
+ year = {2013},
+ month = {01}
+}
+
+@misc{netlink-man-page, 
+ author = {Linux Programmer's Manual},
+ title = {netlink},
+ url = {https://man7.org/linux/man-pages/man7/netlink.7.html}
+}
+
+@misc{rtnetlink-man-page, 
+ author = {Linux Programmer's Manual},
+ title = {rtnetlink},
+ url = {https://man7.org/linux/man-pages/man7/rtnetlink.7.html}
+}
+
+@misc{namespaces-man-page,
+author = {Linux Programmer's Manual},
+title = {namespaces},
+url = {https://man7.org/linux/man-pages/man7/namespaces.7.html}
+}
+
+@misc{seccomp-bpf-kernel-doc,
+ author = {The Linux kernel user-space API guide},
+ title = {Seccomp BPF (SECure COMPuting with filters)},
+ url = {https://www.kernel.org/doc/html/v4.17/userspace-api/seccomp_filter.html}
+}
+
+@inproceedings {246288,
+author = {Alexandru Agache and Marc Brooker and Alexandra Iordache and Anthony Liguori and Rolf Neugebauer and Phil Piwonka and Diana-Maria Popa},
+title = {Firecracker: Lightweight Virtualization for Serverless Applications },
+booktitle = {17th USENIX Symposium on Networked Systems Design and Implementation (NSDI 20)},
+year = {2020},
+isbn = {978-1-939133-13-7},
+address = {Santa Clara, CA},
+pages = {419--434},
+url = {https://www.usenix.org/conference/nsdi20/presentation/agache},
+publisher = {USENIX Association},
+month = feb,
+}

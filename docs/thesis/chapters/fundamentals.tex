@@ -37,7 +37,7 @@ available. Instead, resources are emulated by the virtual machine monitor at the
 and presented as a dedicated hardware system. 
 \textcite{10.1145/361011.361073} define a requirement that the instruction-set architecture 
 of a computer has to satisfy for it to be virtualisable. 
-The instruction set of the computer is to be segregated into three groups of instructions - privileged, sensitive 
+The instruction set must be segregated into three groups of instructions - privileged, sensitive 
 and innocuous. An instruction is privileged if it requires changing the mode of execution from user 
 to supervisor mode by means of a trap.
 An instruction $i$ is control-sensitive if, when applied to the current processor state $S_1$, 

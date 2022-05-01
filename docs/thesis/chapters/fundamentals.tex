@@ -3,61 +3,48 @@
 \subsection{Axioms}
 \subsubsection{Isolation}
 \textcite{10.1145/368481.368502} summarise the fundamental
-requirements of a functional control program and emphasise the concept of
-noninterference between processes across space and time. Spatial and temporal noninterference 
-can be seen as different qualitative measures of the control program's effectiveness to keep
-processes safe. Whereas the former deals with the mechanisms that protect references to memory, disk
-and I/O devices, the latter deals with the allocation of execution time and the protection against 
-the monopolisation thereof.\\ 
-The STRETCH system \cite{10.1145/368481.368502}, albeit quite old, 
-employs an architecture very similar to that of a modern kernel to guarantee noninterference. 
-The authors describe an interruption system that can transfer execution to a 
-different memory address whenever a condition of the machine or process changes, e.g 
-an I/O device emits a signal or the process attempts divison by zero, respectively.
-The address holds the start instruction of a privileged control program routine that can react to the 
-changed condition. For example, the routine could serialise access to an I/O device,
-safely extract the bit stream and propagate it back to the process that issued the I/O request
-by modifying a memory reference local to that process. Since access to the I/O device was 
-serialised, other concurrently running processes requesting usage of that device have to wait
-until the request of the first process has been handled. Hence, one could assume that spatial 
-noninterference between these processes is guaranteed.
-It is important to notice that the control program is allowed to access and 
-modify space assigned to user processes. This means that spatial noninterference between user processes 
-and the control program is not fully guaranteed. If the control program is compromised, then so 
-are all user processes. It follows that if a user process compromises the control 
-program, it transitively interferes with all other user processes in the system. 
-Therefore, a privileged kernel is not enough to satisfy the noninterference property.
-Further protection mechanisms are required.\\
+requirements of a functional control program and emphasise the concept of noninterference between 
+processes across space and time. Spatial and temporal noninterference can be seen as different 
+qualitative measures of the control program's effectiveness to keep processes safe. Whereas the 
+former deals with the mechanisms that protect references to memory, disk and I/O devices, the latter
+deals with the allocation of execution time and the protection against the monopolisation thereof.
+
+The STRETCH system \cite{10.1145/368481.368502}, albeit quite old, employs an architecture used by 
+modern kernels to guarantee noninterference. The author describes an interruption system that can 
+transfer execution to a different memory address whenever a condition of the machine or process 
+changes, e.g an I/O device emits a signal or the process attempts divison by zero, respectively.
+The address holds the start instruction of a privileged routine that can react to the changed 
+condition. For example, the routine could serialise access to an I/O device, decode the bit stream 
+and copy it into a memory block local to the process that issued the request. Serialising access 
+ensures that concurrently executing processes cannot spatially interfere with the request. Scheduling
+the next request to be processed so that all programs make equal or similar runtime progress guarantees 
+temporal noninterference. It is important to note that, by definition, the kernel is considered 
+trustworthy and is allowed to access and modify space assigned to user processes. Therefore, if it is
+compromised or encounters an unrecoverable error condition, all user processes become untrustworthy 
+or unavailable, respectively.
+
 \textcite{10.1145/361011.361073} refer to the control program as a virtual machine monitor that 
 ensures noninterference by providing every program with an environment that is \enquote{[...] effect
 identical with that demonstrated if the program had been run on the original machine directly} 
-\cite[2]{10.1145/361011.361073}. 
-This definition implies that a program does not directly use the bare metal hardware resources 
-available. Instead, resources are emulated by the virtual machine monitor at the instruction-set level 
-and presented as a dedicated hardware system. 
-\textcite{10.1145/361011.361073} define a requirement that the instruction-set architecture 
-of a computer has to satisfy for it to be virtualisable. 
-The instruction set must be segregated into three groups of instructions - privileged, sensitive 
-and innocuous. An instruction is privileged if it requires changing the mode of execution from user 
-to supervisor mode by means of a trap.
-An instruction $i$ is control-sensitive if, when applied to the current processor state $S_1$, 
-results in a new state $i(S_{1}) = S_{2}$ such that the execution mode of $S_{2}$ does not equal 
-that of $S_{1}$ or if $S_{2}$ has access to different resources than $S_1$ or both 
+\cite[2]{10.1145/361011.361073}. This definition implies that a running program, also called a 
+\textit{virtual machine}, does not directly use the bare metal hardware resources available. Instead,
+resources are emulated by the virtual machine monitor at the instruction-set level and presented as a
+dedicated hardware system. \textcite{10.1145/361011.361073} define a requirement that the 
+instruction-set architecture of a computer has to satisfy for it to be virtualisable. The instruction
+set must be segregated into three groups of instructions - privileged, sensitive and innocuous. An 
+instruction is privileged if it requires changing the mode of execution from user to supervisor mode 
+by means of a trap. An instruction $i$ is control-sensitive if, when applied to the current processor
+state $S_1$, results in a new state $i(S_{1}) = S_{2}$ such that the execution mode of $S_{2}$ does 
+not equal that of $S_{1}$ or if $S_{2}$ has access to different resources than $S_1$ or both 
 \cite{10.1145/361011.361073}. An instruction is behaviour-sensitive if its execution depends on the 
-execution mode or its position in memory. An instruction is innocuous if it is not sensitive. 
-Given these definitions, a computer is virtualisable \enquote{[...] if the set of sensitive instructions
+execution mode or its position in memory. An instruction is innocuous if it is not sensitive. Given 
+these definitions, a computer is virtualisable \enquote{[...] if the set of sensitive instructions
 for that computer is a subset of the set of privileged instructions} \cite[6]{10.1145/361011.361073}.
-If this criterion is met, the virtual machine monitor can trap all sensitive instructions and 
-emulate each via a homomorphism $i: C_{r} \rightarrow C_{v}$ that maps the state space of the 
-processor without the virtual machine monitor loaded $C_{r}$ to the state space with the 
-virtual machine monitor loaded $C_{v}$. 
-Innocuous instructions do not require protection, i.e a homomorphic mapping, and are 
-directly executed by the hardware for improved performance. 
+If this criterion is met, the virtual machine monitor can trap all sensitive instructions and emulate 
+each via a homomorphism $i: C_{r} \rightarrow C_{v}$ that maps the state space of the processor without
+the virtual machine monitor loaded $C_{r}$ to the state space with the virtual machine monitor loaded 
+$C_{v}$. Innocuous instructions do not require protection, i.e a homomorphic mapping, and are directly
+executed by the processor.
 
-\subsubsection{Portability}
-% Maybe talk about equivalence here.
-% The program must behave exactly the same both inside the isolated context and on the host system which is a
-% specialization of portability known as equivalence. In general however, portability may 
-% even mean that the program is executable across different application binary interfaces and 
-% even operating systems. 
+
 \subsubsection{Performance}

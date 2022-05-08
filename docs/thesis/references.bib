@@ -35,3 +35,105 @@ pages = {412-421},
 numpages = {10},
 keywords = {virtual machine, operating system, abstract model, proof, virtual machine monitor, hypervisor, virtual memory, sensitive instruction, formal requirements, third generation architecture}
 }
+
+@article{10.1145/3365199,
+author = {Randal, Allison},
+title = {The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers},
+year = {2020},
+issue_date = {January 2021},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {53},
+number = {1},
+issn = {0360-0300},
+url = {https://doi.org/10.1145/3365199},
+doi = {10.1145/3365199},
+abstract = {The common perception in both academic literature and industry today is that virtual machines offer better security, whereas containers offer better performance. However, a detailed review of the history of these technologies and the current threats they face reveals a different story. This survey covers key developments in the evolution of virtual machines and containers from the 1950s to today, with an emphasis on countering modern misperceptions with accurate historical details and providing a solid foundation for ongoing research into the future of secure isolation for multitenant infrastructures, such as cloud and container deployments.},
+journal = {ACM Comput. Surv.},
+month = {feb},
+articleno = {5},
+numpages = {31},
+keywords = {virtualization, Containers, virtual machines}
+}
+
+@book{10.5555/2490781,
+author = {Silberschatz, Abraham and Galvin, Peter B. and Gagne, Greg},
+title = {Operating System Concepts},
+year = {2018},
+isbn = {9781119320913},
+publisher = {Wiley Publishing},
+edition = {10th},
+abstract = {The 10 edition of Operating System Concepts continues to evolve to provide a solid theoretical foundation for understanding operating systems. This edition has been updated with more extensive coverage of the most current topics and applications, improved conceptual coverage and additional content to bridge the gap between concepts and actual implementations. A new design allows for easier navigation and enhances reader motivation. Additional end-of-chapter, exercises, review questions, and programming exercises help to further reinforce important concepts. WileyPLUS, including a test bank, self-check exercises, and a student solutions manual, is also part of the comprehensive support package.}
+}
+
+@inproceedings{10.1145/3381052.3381315,
+author = {Anjali and Caraza-Harter, Tyler and Swift, Michael M.},
+title = {Blending Containers and Virtual Machines: A Study of Firecracker and GVisor},
+year = {2020},
+isbn = {9781450375542},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/3381052.3381315},
+doi = {10.1145/3381052.3381315},
+abstract = {With serverless computing, providers deploy application code and manage resource allocation dynamically, eliminating infrastructure management from application development.Serverless providers have a variety of virtualization platforms to choose from for isolating functions, ranging from native Linux processes to Linux containers to lightweight isolation platforms, such as Google gVisor [7] and AWS Firecracker [5]. These platforms form a spectrum as they move functionality out of the host kernel and into an isolated guest environment. For example, gVisor handles many system calls in a user-mode Sentry process while Firecracker runs a full guest operating system in each microVM. A common theme across these platforms are the twin goals of strong isolation and high performance.In this paper, we perform a comparative study of Linux containers (LXC), gVisor secure containers, and Firecracker microVMs to understand how they use Linux kernel services differently: how much does their use of host kernel functionality vary? We also evaluate the performance costs of the designs with a series of microbenchmarks targeting different kernel subsystems.Our results show that despite moving much functionality out of the kernel, both Firecracker and gVisor execute substantially more kernel code than native Linux. gVisor and Linux containers execute substantially the same code, although with different frequency.},
+booktitle = {Proceedings of the 16th ACM SIGPLAN/SIGOPS International Conference on Virtual Execution Environments},
+pages = {101–113},
+numpages = {13},
+keywords = {benchmarking, gVisor, firecracker, serverless computing, operating systems, virtualization, code coverage},
+location = {Lausanne, Switzerland},
+series = {VEE '20}
+}
+
+@inproceedings{10.1145/3132747.3132763,
+author = {Manco, Filipe and Lupu, Costin and Schmidt, Florian and Mendes, Jose and Kuenzer, Simon and Sati, Sumit and Yasukata, Kenichi and Raiciu, Costin and Huici, Felipe},
+title = {My VM is Lighter (and Safer) than Your Container},
+year = {2017},
+isbn = {9781450350853},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/3132747.3132763},
+doi = {10.1145/3132747.3132763},
+abstract = {Containers are in great demand because they are lightweight when compared to virtual machines. On the downside, containers offer weaker isolation than VMs, to the point where people run containers in virtual machines to achieve proper isolation. In this paper, we examine whether there is indeed a strict tradeoff between isolation (VMs) and efficiency (containers). We find that VMs can be as nimble as containers, as long as they are small and the toolstack is fast enough.We achieve lightweight VMs by using unikernels for specialized applications and with Tinyx, a tool that enables creating tailor-made, trimmed-down Linux virtual machines. By themselves, lightweight virtual machines are not enough to ensure good performance since the virtualization control plane (the toolstack) becomes the performance bottleneck. We present LightVM, a new virtualization solution based on Xen that is optimized to offer fast boot-times regardless of the number of active VMs. LightVM features a complete redesign of Xen's control plane, transforming its centralized operation to a distributed one where interactions with the hypervisor are reduced to a minimum. LightVM can boot a VM in 2.3ms, comparable to fork/exec on Linux (1ms), and two orders of magnitude faster than Docker. LightVM can pack thousands of LightVM guests on modest hardware with memory and CPU usage comparable to that of processes.},
+booktitle = {Proceedings of the 26th Symposium on Operating Systems Principles},
+pages = {218–233},
+numpages = {16},
+keywords = {operating systems, specialization, containers, virtual machine, Virtualization, hypervisor, Xen, unikernels},
+location = {Shanghai, China},
+series = {SOSP '17}
+}
+
+@article{10.1145/3140607.3050757,
+author = {Kuenzer, Simon and Ivanov, Anton and Manco, Filipe and Mendes, Jose and Volchkov, Yuri and Schmidt, Florian and Yasukata, Kenichi and Honda, Michio and Huici, Felipe},
+title = {Unikernels Everywhere: The Case for Elastic CDNs},
+year = {2017},
+issue_date = {July 2017},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {52},
+number = {7},
+issn = {0362-1340},
+url = {https://doi.org/10.1145/3140607.3050757},
+doi = {10.1145/3140607.3050757},
+abstract = {Video streaming dominates the Internet's overall traffic mix, with reports stating that it will constitute 90% of all consumer traffic by 2019. Most of this video is delivered by Content Delivery Networks (CDNs), and, while they optimize QoE metrics such as buffering ratio and start-up time, no single CDN provides optimal performance. In this paper we make the case for elastic CDNs, the ability to build virtual CDNs on-the-fly on top of shared, third-party infrastructure at a scale. To bring this idea closer to reality we begin by large-scale simulations to quantify the effects that elastic CDNs would have if deployed, and build and evaluate MiniCache, a specialized, minimalistic virtualized content cache that runs on the Xen hypervisor. MiniCache is able to serve content at rates of up to 32 Gb/s and handle up to 600K reqs/sec on a single CPU core, as well as boot in about 90 milliseconds on x86 and around 370 milliseconds on ARM32.},
+journal = {SIGPLAN Not.},
+month = {apr},
+pages = {15–29},
+numpages = {15}
+}
+
+@inproceedings{10.1145/3050748.3050757,
+author = {Kuenzer, Simon and Ivanov, Anton and Manco, Filipe and Mendes, Jose and Volchkov, Yuri and Schmidt, Florian and Yasukata, Kenichi and Honda, Michio and Huici, Felipe},
+title = {Unikernels Everywhere: The Case for Elastic CDNs},
+year = {2017},
+isbn = {9781450349482},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/3050748.3050757},
+doi = {10.1145/3050748.3050757},
+booktitle = {Proceedings of the 13th ACM SIGPLAN/SIGOPS International Conference on Virtual Execution Environments},
+pages = {15–29},
+numpages = {15},
+location = {Xi'an, China},
+series = {VEE '17}
+}
+

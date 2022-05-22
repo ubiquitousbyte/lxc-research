@@ -1,0 +1,2 @@
+set(LXCR_VERSION 0.1)
+set(LXCR_DESCRIPTION "Linux Container Research")

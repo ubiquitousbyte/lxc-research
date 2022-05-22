@@ -53,7 +53,7 @@ ensures isolation and noninterference by providing every program with an environ
 identical with that demonstrated if the program had been run on the original machine directly} 
 \cite[2]{10.1145/361011.361073}. This definition implies that a running program does not directly use
 the bare metal resources available. Instead, resources are emulated by the virtual machine monitor at
-the instruction level and presented as a dedicated physical system. Such an environment is called 
+the hardware level and presented as a dedicated physical system. Such an environment is called 
 a \textit{virtual machine}.
 
 \textcite{10.1145/361011.361073} define a requirement that the instruction-set architecture of a computer
@@ -74,13 +74,13 @@ $C_{v}$ \cite{10.1145/361011.361073}. Innocuous instructions do not require prot
 mapping, and are directly executed by the processor \cite{10.1145/361011.361073}.
 
 Given the aforementioned homomorphism, a virtual machine can host a \textit{guest kernel} 
-(see Figure \ref{images:fundamentals/full-virt-arch.jpg}) that interacts with the virtual machine monitor
-as if it were a dedicated physical system - by executing instructions that are transparently emulated.
-Consequently, the isolation boundary between user programs running on different virtual 
-machines is stronger compared to processes running on a shared kernel. Even if a guest kernel 
-is compromised or encounters an unrecoverable error condition, other virtual machines remain 
-unaffected. In other words, the guest kernel does not have to be a part of the trusted computing 
-base.
+(see Figure \ref{images:fundamentals/full-virt-arch.jpg}) that runs completely in user mode. 
+Whenever the guest kernel attempts to execute a privileged instruction, 
+the virtual machine monitor traps the attempt and emulates the instruction. 
+Consequently, the guest kernel does not have to be a part of the trusted computing base. 
+Even if it is compromised or encounters an unrecoverable error condition, other virtual machines 
+remain unaffected. As a result, the isolaton boundary between user programs running in different 
+virtual machines is stronger compared to processes running on a shared kernel. 
 
 \begin{figure}
     \centering
@@ -114,12 +114,13 @@ virtual machines using the Xen virtual machine monitor.
 As the number of consolidated virtual instances increases, creation and boot times increase linearly. 
 Furthermore, the authors show that creating and starting a process directly on the host is, on average, 
 two orders of magnitude faster. \textcite{10.1145/2151024.2151030} come to the same conclusion and show
-that high frequency context switches also negatively impact performance.
+that high frequency context switches also negatively impact performance. 
 
 \subsection{Operating System Virtualisation}
 \label{ch:fundamentals/virtualisation/os-virtualisation}
 \textit{Operating system virtualisation} refers to all mechanisms that enable the creation of secure
-and isolated application environments running on top of a shared kernel (see Figure \ref{images:fundamentals/kernel-virt-arch.jpg}). 
+and isolated application environments running on top of a shared kernel (see Figure 
+\ref{images:fundamentals/kernel-virt-arch.jpg}). 
 
 %The STRETCH system \cite{10.1145/368481.368502}, albeit quite old, employs an architecture used by 
 %modern kernels to guarantee noninterference. The author describes an interruption system that can 

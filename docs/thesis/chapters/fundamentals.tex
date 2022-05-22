@@ -24,61 +24,29 @@ that makes sure that no process has hold of the core for too long, guarantee tem
 platform has towards the host kernel. We generalise this definition and say that \textit{isolation} 
 is the level of dependency that one piece of software has to another. Conceptually, isolation 
 deals with explicit vertical relationships between software, and noninterference deals with 
-implicit horizontal relationships between processes. The level of dependency can be quantified by 
-counting the lines of external code that a software executes to obtain a desired functionality. 
+implicit horizontal relationships between processes. Isolation can be quantified by counting the 
+lines of external source code that a software executes to obtain a particular functionality. 
 For example, \textcite{10.1145/3381052.3381315} count the lines of kernel code 
 that a virtualisation platform executes when providing services to sandboxed applications. 
-High counts indicate a strong dependency, i.e weak isolation.  
+High counts indicate a strong dependency, i.e weak isolation, towards the kernel. 
 
 \subsubsection{Performance}
 \label{ch:fundamentals/virtualisation/axioms/performance}
 \textcite{10.1145/3365199} defines performance as the contention between the overhead associated 
 with isolating a process from its environment and the benefits of sharing resources between processes,
-i.e fully utilising the capacity of the underlying resource pool. \textcite{10.1145/3381052.3381315}
-use a similar definition and measure the level of isolation provided by three different virtualisation 
-platforms contrasted against processing unit, memory and input-output performance metrics. 
-Isolation is measured as described in Chapter \ref{ch:fundamentals/virtualisation/axioms/isolation}.
-The lines of code are mapped to the kernel 
-subsystem in which they reside, resulting in an isolation metric per subsystem.
-Workloads are then executed as sandboxed applications, instantiated multiple times to measure resource 
-utilisation on a single host system, and compared against the lines of code executed by the subsystem 
-that the workload corresponds to. For example, the authors define an application that computes prime numbers up 
-to a limit. Since the workload is compute-bound, processing speed is measured and compared to the 
-number of lines of executed code that reside in the processing unit and architecture-specific subsystems of
-the kernel.
-
-\textcite{10.1145/3132747.3132763} use \textit{same-host density} as a performance metric that measures 
-the number of sandboxed applications that can be consolidated onto a single server.. 
-In addition, \textit{boot, pause and unpause times} are also considered as important performance indicators for particular 
-use cases, such as elastic content delivery networks \cite{10.1145/3050748.3050757} \cite{10.1145/3132747.3132763}.
-The authors \enquote{sequentially start 1000 virtual machines and measure the time it takes to
-create each VM and the time it takes the VM to boot} \cite[5]{10.1145/3132747.3132763}.
+i.e fully utilising the capacity of the underlying resource pool. 
+\textcite{10.1145/3381052.3381315} use the same definition and contrast the isolation mechanisms provided
+by three different virtualisation platforms against processing unit, memory and input-output performance metrics. 
+In particular, the authors define an application that computes prime numbers up to a limit. 
+Since the workload is compute-bound, processing speed is measured and compared to the
+number of executed lines of code that reside in the \verb|/arch|, \verb|/virt| and \verb|/arch/x86/kvm|
+subsystems of the Linux kernel. \textcite{10.1145/3132747.3132763} use \textit{same-host density} as a 
+performance metric that measures the number of sandboxed applications that can be consolidated onto a single server. 
+In addition, \textit{boot, pause and unpause times} are also considered to be important performance indicators for particular 
+use cases, such as elastic content delivery networks \cite{10.1145/3050748.3050757} \cite{10.1145/3132747.3132763}
+and serverless computing.
 
 \subsection{Hardware Virtualisation}
-%\begin{figure}
-%    \centering
-%        \begin{subfigure}[b]{0.45\textwidth}
-%            \centering
-%            \includegraphics[width=0.6\textwidth]{images/fundamentals/kernel-virt-arch.jpg}
-%            \caption{Virtualisation using a shared kernel that constantly assures noninterference by 
-%                    handling service requests from user processes. Kernel has full control of the system
-%                    and represents a single point of failure. There are no mechanisms to reestablsh 
-%                    system health.}
-%            \label{images:fundamentals/kernel-virt-arch.jpg}
-%        \end{subfigure}%
-%        \hfill
-%        \begin{subfigure}[b]{0.45\textwidth}
-%            \centering
-%            \includegraphics[width=0.6\textwidth]{images/fundamentals/full-virt-arch.jpg}
-%            \caption{Virtualisation using multiple independent kernels, each ensuring noninterference. 
-%                    If one kernel fails, the virtual machine monitor can reclaim the respective resources or 
-%                    perform operations that reconstruct the virtual machine's state from a health checkpoint.}
-%            \label{images:fundamentals/full-virt-arch.jpg}
-%        \end{subfigure}
-%    \caption{Architectural comparison between shared-kernel virtualisation (\ref{images:fundamentals/kernel-virt-arch.jpg})
-%             and multi-kernel virtualisation using a virtual machine monitor (\ref{images:fundamentals/full-virt-arch.jpg})}
-%    \label{images:fundamentals/virt-arch}
-%\end{figure}
 \label{ch:fundamentals/virtualisation/hardware-virtualisation}
 \textcite{10.1145/361011.361073} refer to the control program as a \textit{virtual machine monitor} that 
 ensures isolation and noninterference by providing every program with an environment that is \enquote{[...] effect
@@ -105,21 +73,53 @@ the virtual machine monitor loaded $C_{r}$ to the state space with the virtual m
 $C_{v}$ \cite{10.1145/361011.361073}. Innocuous instructions do not require protection, i.e a homomorphic
 mapping, and are directly executed by the processor \cite{10.1145/361011.361073}.
 
-The aforementioned homomorphism enables a virtual machine to host a kernel, referred to as a \textit{guest kernel}, that 
-\enquote{believes} it is interacting with a physical system.
-Consequently, the isolation and noninterference boundaries between user programs 
-running on different virtual machines are stronger compared to user processes running on a shared kernel. 
-Even if a guest kernel becomes compromised or encounters an unrecoverable error condition, 
-other virtual machines remain unaffected.
+Given the aforementioned homomorphism, a virtual machine can host a \textit{guest kernel} 
+(see Figure \ref{images:fundamentals/full-virt-arch.jpg}) that interacts with the virtual machine monitor
+as if it were a dedicated physical system - by executing instructions that are transparently emulated.
+Consequently, the isolation boundary between user programs running on different virtual 
+machines is stronger compared to processes running on a shared kernel. Even if a guest kernel 
+is compromised or encounters an unrecoverable error condition, other virtual machines remain 
+unaffected. In other words, the guest kernel does not have to be a part of the trusted computing 
+base.
 
-The performance cost of hardware virtualisation becomes aparent when measuring same-host density
+\begin{figure}
+    \centering
+        \begin{subfigure}[b]{0.45\textwidth}
+            \centering
+            \includegraphics[width=0.6\textwidth]{images/fundamentals/kernel-virt-arch.jpg}
+            \caption{Virtualisation using a shared kernel that constantly assures noninterference by 
+                    handling service requests from user processes. Kernel has full control of the system
+                    and represents a single point of failure. There are no mechanisms to reestablsh 
+                    system health.}
+            \label{images:fundamentals/kernel-virt-arch.jpg}
+        \end{subfigure}%
+        \hfill
+        \begin{subfigure}[b]{0.45\textwidth}
+            \centering
+            \includegraphics[width=0.6\textwidth]{images/fundamentals/full-virt-arch.jpg}
+            \caption{Virtualisation using multiple independent kernels, each ensuring noninterference. 
+                    If one kernel fails, the virtual machine monitor can reclaim the respective resources or 
+                    perform operations that reconstruct the virtual machine's state from a health checkpoint.}
+            \label{images:fundamentals/full-virt-arch.jpg}
+        \end{subfigure}
+    \caption{Architectural comparison between operating-system virtualisation (\ref{images:fundamentals/kernel-virt-arch.jpg})
+             and hardware virtualisation using a virtual machine monitor (\ref{images:fundamentals/full-virt-arch.jpg})}
+    \label{images:fundamentals/virt-arch}
+\end{figure}
+
+The cost of hardware virtualisation becomes apparent when measuring same-host density
 and boot times. \textcite{10.1145/3132747.3132763} consider memory consumption and on-disk image size
-as the primary limiting factors. \textcite{10.1145/2151024.2151030} come to the same conclusion and further 
-show that the high frequency of context switches also has a negative impact.
+as the primary limiting factors. The authors measure the time it takes to create and boot
+virtual machines using the Xen virtual machine monitor.
+As the number of consolidated virtual instances increases, creation and boot times increase linearly. 
+Furthermore, the authors show that creating and starting a process directly on the host is, on average, 
+two orders of magnitude faster. \textcite{10.1145/2151024.2151030} come to the same conclusion and show
+that high frequency context switches also negatively impact performance.
 
 \subsection{Operating System Virtualisation}
 \label{ch:fundamentals/virtualisation/os-virtualisation}
-
+\textit{Operating system virtualisation} refers to all mechanisms that enable the creation of secure
+and isolated application environments running on top of a shared kernel (see Figure \ref{images:fundamentals/kernel-virt-arch.jpg}). 
 
 %The STRETCH system \cite{10.1145/368481.368502}, albeit quite old, employs an architecture used by 
 %modern kernels to guarantee noninterference. The author describes an interruption system that can 

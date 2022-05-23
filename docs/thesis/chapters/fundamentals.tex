@@ -94,12 +94,13 @@ The virtual machine monitor traps this attempt and transparently updates the pag
 the guest's shadow page table corresponding to that process \cite{10.5555/1204009}. Note that 
 the virtual machine monitor has to traverse the shadow page table for that guest in order to find the nested entry corresponding 
 to the process. Afterwards, the memory management unit takes care of translating the virtual memory 
-addresses of the guest and updating the translation lookaside buffer.
+addresses of the guest and updating the \textit{translation lookaside buffer}.
 Alternatively, the memory management unit may be \enquote{virtualisation-aware} in the sense that it knows 
 there are two page tables it needs to traverse - the page table that maps guest virtual memory to guest 
 \enquote{physical memory}, and the page table that maps guest physical memory to actual physical memory. 
 The former is maintained by the guest kernel, whilst the latter is maintained by the virtual machine monitor.
-The extended page table approach is faster because table walks are done in hardware - by the memory management unit. 
+The extended page table approach is up to 50\% faster than shadow paging \cite{2006PerformanceEO} because table
+walks are done in hardware - by the memory management unit.
 Nevertheless, maintaining page table data structures inside the virtual machine 
 monitor and the guests leads to memory pressure, which is further amplified by the fact that 
 guests, their applications and the virtual machine monitor all share the same physical memory \cite{10.5555/2490781}. 

@@ -41,7 +41,7 @@ In particular, the authors define an application that computes prime numbers up 
 Since the workload is compute-bound, processing speed is measured and compared to the
 number of executed lines of code that reside in the \verb|/arch|, \verb|/virt| and \verb|/arch/x86/kvm|
 subsystems of the Linux kernel. \textcite{10.1145/3132747.3132763} use \textit{same-host density} as a 
-performance metric that measures the number of sandboxed applications that can be consolidated onto a single server. 
+performance metric that measures the number of sandboxed applications that can be consolidated onto a single server.
 In addition, \textit{boot, pause and unpause times} are also considered to be important performance indicators for particular 
 use cases, such as elastic content delivery networks \cite{10.1145/3050748.3050757} \cite{10.1145/3132747.3132763}
 and serverless computing.
@@ -79,8 +79,30 @@ Whenever the guest kernel attempts to execute a privileged instruction,
 the virtual machine monitor traps the attempt and emulates the instruction. 
 Consequently, the guest kernel does not have to be a part of the trusted computing base. 
 Even if it is compromised or encounters an unrecoverable error condition, other virtual machines 
-remain unaffected. As a result, the isolaton boundary between user programs running in different 
+remain unaffected. As a result, the isolation boundary between user programs running in different 
 virtual machines is stronger compared to processes running on a shared kernel. 
+
+In order to fully guarantee spatial noninterference between processes, the virtual machine monitor must 
+be in full control of the host system's memory. There are two primary methods to do this - \textit{shadow paging} and \textit{extended page tables}.
+The former mechanism is considered first. 
+The virtual machine monitor maintains a nested page table 
+per guest, also called a \textit{shadow page table} \cite{10.5555/1204009}. 
+In turn, the guest kernel maintains a page table per process. 
+Whenever the guest kernel schedules a new process for execution, it modifies the \textit{page-table 
+base register} to point to the page table for that process \cite{10.5555/1204009}. 
+The virtual machine monitor traps this attempt and transparently updates the page table pointer to point to 
+the guest's shadow page table corresponding to that process \cite{10.5555/1204009}. Note that 
+the virtual machine monitor has to traverse the shadow page table for that guest in order to find the nested entry corresponding 
+to the process. Afterwards, the memory management unit takes care of translating the virtual memory 
+addresses of the guest and updating the translation lookaside buffer.
+Alternatively, the memory management unit may be \enquote{virtualisation-aware} in the sense that it knows 
+there are two page tables it needs to traverse - the page table that maps guest virtual memory to guest 
+\enquote{physical memory}, and the page table that maps guest physical memory to actual physical memory. 
+The former is maintained by the guest kernel, whilst the latter is maintained by the virtual machine monitor.
+The extended page table approach is faster because table walks are done in hardware - by the memory management unit. 
+Nevertheless, maintaining page table data structures inside the virtual machine 
+monitor and the guests leads to memory pressure, which is further amplified by the fact that 
+guests, their applications and the virtual machine monitor all share the same physical memory \cite{10.5555/2490781}. 
 
 \begin{figure}
     \centering

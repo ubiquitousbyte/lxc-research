@@ -1,5 +1,14 @@
 \chapter{Fundamentals}
 \section{Virtualisation}
+Chapter \ref{ch:fundamentals/virtualisation/axioms} introduces the fundamental axioms that define 
+virtualisation - noninterference, isolation and performance. 
+Chapter \ref{ch:fundamentals/virtualisation/hardware-virtualisation} presents hardware virtualisation 
+as a concept, discusses the mechanisms it uses to satisfy the axioms, and highlights the trade-offs
+intrinsic to its design. 
+Chapter \ref{ch:fundamentals/virtualisation/os-virtualisation} describes a more coarse-grained 
+approach - operating system virtualisation - that has become the de-facto way of managing cloud workloads in 
+multitenant environments. 
+
 \subsection{Axioms}
 \label{ch:fundamentals/virtualisation/axioms}
 \subsubsection{Noninterference}
@@ -73,8 +82,7 @@ the virtual machine monitor loaded $C_{r}$ to the state space with the virtual m
 $C_{v}$ \cite{10.1145/361011.361073}. Innocuous instructions do not require protection, i.e a homomorphic
 mapping, and are directly executed by the processor \cite{10.1145/361011.361073}.
 
-Given the aforementioned homomorphism, a virtual machine can host a \textit{guest kernel} 
-(see Figure \ref{images:fundamentals/full-virt-arch.jpg}) that runs completely in user mode. 
+Given the aforementioned homomorphism, a virtual machine can host a \textit{guest kernel} that runs completely in user mode. 
 Whenever the guest kernel attempts to execute a privileged instruction, 
 the virtual machine monitor traps the attempt and emulates the instruction. 
 Consequently, the guest kernel does not have to be a part of the trusted computing base. 
@@ -83,14 +91,14 @@ remain unaffected. As a result, the isolation boundary between user programs run
 virtual machines is stronger compared to processes running on a shared kernel. 
 
 In order to fully guarantee spatial noninterference between processes, the virtual machine monitor must 
-be in full control of the host system's memory. There are two primary methods to do this - \textit{shadow paging} and \textit{extended page tables}.
-The former mechanism is considered first. 
+be in full control of the host system's memory. There are two primary methods to do this - 
+\textit{shadow paging} and \textit{extended page tables}. The former mechanism is considered first. 
 The virtual machine monitor maintains a nested page table 
 per guest, also called a \textit{shadow page table} \cite{10.5555/1204009}. 
 In turn, the guest kernel maintains a page table per process. 
 Whenever the guest kernel schedules a new process for execution, it modifies the \textit{page-table 
 base register} to point to the page table for that process \cite{10.5555/1204009}. 
-The virtual machine monitor traps this attempt and transparently updates the page table pointer to point to 
+The virtual machine monitor intercepts this attempt and transparently updates the page table pointer to point to 
 the guest's shadow page table corresponding to that process \cite{10.5555/1204009}. Note that 
 the virtual machine monitor has to traverse the shadow page table for that guest in order to find the nested entry corresponding 
 to the process. Afterwards, the memory management unit takes care of translating the virtual memory 
@@ -105,45 +113,68 @@ Nevertheless, maintaining page table data structures inside the virtual machine
 monitor and the guests leads to memory pressure, which is further amplified by the fact that 
 guests, their applications and the virtual machine monitor all share the same physical memory \cite{10.5555/2490781}. 
 
-\begin{figure}
-    \centering
-        \begin{subfigure}[b]{0.45\textwidth}
-            \centering
-            \includegraphics[width=0.6\textwidth]{images/fundamentals/kernel-virt-arch.jpg}
-            \caption{Virtualisation using a shared kernel that constantly assures noninterference by 
-                    handling service requests from user processes. Kernel has full control of the system
-                    and represents a single point of failure. There are no mechanisms to reestablsh 
-                    system health.}
-            \label{images:fundamentals/kernel-virt-arch.jpg}
-        \end{subfigure}%
-        \hfill
-        \begin{subfigure}[b]{0.45\textwidth}
-            \centering
-            \includegraphics[width=0.6\textwidth]{images/fundamentals/full-virt-arch.jpg}
-            \caption{Virtualisation using multiple independent kernels, each ensuring noninterference. 
-                    If one kernel fails, the virtual machine monitor can reclaim the respective resources or 
-                    perform operations that reconstruct the virtual machine's state from a health checkpoint.}
-            \label{images:fundamentals/full-virt-arch.jpg}
-        \end{subfigure}
-    \caption{Architectural comparison between operating-system virtualisation (\ref{images:fundamentals/kernel-virt-arch.jpg})
-             and hardware virtualisation using a virtual machine monitor (\ref{images:fundamentals/full-virt-arch.jpg})}
-    \label{images:fundamentals/virt-arch}
-\end{figure}
+The spatial noninterference property necessitates that the virtual machine monitor manage 
+all input-output devices and their interactions with the guests. This is accomplished by the
+already introduced trap-and-emulate pattern. When an application within a virtual machine 
+issues a system call requesting some form of input-output, the request is processed by the 
+I/O stack inside the guest. At the lowest level of the stack, the device driver issues a 
+command to the device, typically by writing to memory specifically assigned to the device, or by
+calling specific input-output instructions \cite{10.5555/2490781}. 
+Either way, the virtual machine monitor intercepts this and traverses its own I/O stack, which 
+remaps guest and real input-output addresses and forwards the request to a physical device \cite{10.1145/2063176.2063194}. 
+After processing the request, the physical device triggers an interrupt that is caught by the virtual machine monitor and 
+transformed into a virtual equivalent that is sent to the virtual machine that issued the request.
+To reduce the overhead associated with interrupt processing, the virtual machine monitor can batch 
+multiple events together and use a single interrupt to notify the guest kernel \cite{10.1145/2063176.2063194}.
+Still, a request must traverse two input-output stacks. The same holds for the response.
+In addition, hardware optimisations such as direct memory access are emulated in software, which 
+further degrades performance. This, however, can be mitigated by integrating an input-output memory management 
+unit that remaps all direct memory accesses of a device on the host to an address space in the guest.
+
+%\begin{figure}
+%    \centering
+%        \begin{subfigure}[b]{0.45\textwidth}
+%            \centering
+%            \includegraphics[width=0.6\textwidth]{images/fundamentals/kernel-virt-arch.jpg}
+%            \caption{Virtualisation using a shared kernel that constantly assures noninterference by 
+%                    handling service requests from user processes. Kernel has full control of the system
+%                    and represents a single point of failure. There are no mechanisms to reestablsh 
+%                    system health.}
+%            \label{images:fundamentals/kernel-virt-arch.jpg}
+%        \end{subfigure}%
+%        \hfill
+%        \begin{subfigure}[b]{0.45\textwidth}
+%            \centering
+%            \includegraphics[width=0.6\textwidth]{images/fundamentals/full-virt-arch.jpg}
+%            \caption{Virtualisation using multiple independent kernels, each ensuring noninterference. 
+%                    If one kernel fails, the virtual machine monitor can reclaim the respective resources or 
+%                    perform operations that reconstruct the virtual machine's state from a health checkpoint.}
+%            \label{images:fundamentals/full-virt-arch.jpg}
+%        \end{subfigure}
+%    \caption{Architectural comparison between operating-system virtualisation (\ref{images:fundamentals/kernel-virt-arch.jpg})
+%             and hardware virtualisation using a virtual machine monitor (\ref{images:fundamentals/full-virt-arch.jpg})}
+%    \label{images:fundamentals/virt-arch}
+%\end{figure}
 
 The cost of hardware virtualisation becomes apparent when measuring same-host density
 and boot times. \textcite{10.1145/3132747.3132763} consider memory consumption and on-disk image size
 as the primary limiting factors. The authors measure the time it takes to create and boot
 virtual machines using the Xen virtual machine monitor.
-As the number of consolidated virtual instances increases, creation and boot times increase linearly. 
+The authors show the negative effects that on-disk image size has by starting images with 
+varying sizes by manually \enquote{[...] injecting binary objects into the uncompressed image file} \cite[3]{10.1145/3132747.3132763}. 
+As the number of consolidated virtual instances increases and the image size grows, 
+creation and boot times increase linearly.
 Furthermore, the authors show that creating and starting a process directly on the host is, on average, 
-two orders of magnitude faster. \textcite{10.1145/2151024.2151030} come to the same conclusion and show
-that high frequency context switches also negatively impact performance. 
+two orders of magnitude faster. \textcite{10.1145/2151024.2151030} also evaluate Xen and state
+that processing units spend 25\% of their total cycles in hypervisor mode instead of executing guest applications 
+when running \enquote{[...] SPEC's first benchmark addressing performance evaluation of datacenter servers used in 
+virtualised server consolidation} \cite[2]{10.1145/2151024.2151030}, which includes components 
+such as a web, database and application server.  
 
 \subsection{Operating System Virtualisation}
 \label{ch:fundamentals/virtualisation/os-virtualisation}
 \textit{Operating system virtualisation} refers to all mechanisms that enable the creation of secure
-and isolated application environments running on top of a shared kernel (see Figure 
-\ref{images:fundamentals/kernel-virt-arch.jpg}). 
+and isolated application environments running on top of a shared kernel. 
 
 %The STRETCH system \cite{10.1145/368481.368502}, albeit quite old, employs an architecture used by 
 %modern kernels to guarantee noninterference. The author describes an interruption system that can 

@@ -65,6 +65,14 @@ the bare metal resources available. Instead, resources are emulated by the virtu
 the hardware level and presented as a dedicated physical system. Such an environment is called 
 a \textit{virtual machine}.
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.70\textwidth]{images/fundamentals/full-virt-archh.jpg}
+    \caption{Hardware virtualisation architecture. Each guest runs a complete operating system. 
+             Privileged operations are trapped by the virtual machine monitor and emulated to provide hardware services.}
+    \label{images:fundamentals/full-virt-archh.jpg}
+\end{figure}
+
 \textcite{10.1145/361011.361073} define a requirement that the instruction-set architecture of a computer
 has to satisfy for it to be virtualisable. The instruction set must be segregated into three groups of
 instructions - privileged, sensitive and innocuous. An instruction is privileged if it requires changing
@@ -82,7 +90,8 @@ the virtual machine monitor loaded $C_{r}$ to the state space with the virtual m
 $C_{v}$ \cite{10.1145/361011.361073}. Innocuous instructions do not require protection, i.e a homomorphic
 mapping, and are directly executed by the processor \cite{10.1145/361011.361073}.
 
-Given the aforementioned homomorphism, a virtual machine can host a \textit{guest kernel} that runs completely in user mode. 
+Given the aforementioned homomorphism, a virtual machine can host a \textit{guest kernel} (Figure \ref{images:fundamentals/full-virt-archh.jpg}) that 
+runs completely in user mode. 
 Whenever the guest kernel attempts to execute a privileged instruction, 
 the virtual machine monitor traps the attempt and emulates the instruction. 
 Consequently, the guest kernel does not have to be a part of the trusted computing base. 
@@ -159,8 +168,8 @@ unit that remaps all direct memory accesses of a device on the host to an addres
 The cost of hardware virtualisation becomes apparent when measuring same-host density
 and boot times. \textcite{10.1145/3132747.3132763} consider memory consumption and on-disk image size
 as the primary limiting factors. The authors measure the time it takes to create and boot
-virtual machines using the Xen virtual machine monitor.
-The authors show the negative effects that on-disk image size has by starting images with 
+virtual machines using the Xen virtual machine monitor and show the negative effects that on-disk image size has 
+by starting images with 
 varying sizes by manually \enquote{[...] injecting binary objects into the uncompressed image file} \cite[3]{10.1145/3132747.3132763}. 
 As the number of consolidated virtual instances increases and the image size grows, 
 creation and boot times increase linearly.
@@ -169,12 +178,30 @@ two orders of magnitude faster. \textcite{10.1145/2151024.2151030} also evaluate
 that processing units spend 25\% of their total cycles in hypervisor mode instead of executing guest applications 
 when running \enquote{[...] SPEC's first benchmark addressing performance evaluation of datacenter servers used in 
 virtualised server consolidation} \cite[2]{10.1145/2151024.2151030}, which includes components 
-such as a web, database and application server.  
+such as a web, database and application server.
 
 \subsection{Operating System Virtualisation}
 \label{ch:fundamentals/virtualisation/os-virtualisation}
 \textit{Operating system virtualisation} refers to all mechanisms that enable the creation of secure
-and isolated application environments running on top of a shared kernel. 
+and isolated application environments that run on top of a shared kernel. 
+Conventionally, these mechanisms are baked into the kernel and are therefore part of the trusted computing base.
+The kernel may expose these through its system-call interface, thereby allowing a user-space daemon 
+program to provide an automated facility for creating and orchestrating sandboxed environments. 
+Alternatively, the kernel may treat every software component, including its own subsystems, as an entity
+to be wrapped in a sandbox. In that case, the environment in which every program is instantiated would have to 
+satisfy all three virtualisation axioms.
+
+Unlike hardware virtualisation, this architecture does not use hardware emulation as an 
+isolation primitive.
+This means that shadow pages need not be maintained per virtual environment. Input-output operations need only 
+traverse the kernel's stack without any address translations and with the additional 
+performance benefit of direct memory access. As a result, the isolation overhead is lower 
+compared to a virtual machine, which allows more applications to be consolidated onto a single server.
+Furthermore, guests do not boot up complete operating system images, which practically eliminates 
+boot times.
+\textcite{10.1145/3126908.3126925} use operating system virtualisation in high-performance 
+computing clusters to run user-defined compute jobs and show that the imposed performance penalties 
+are, at most, negligible compared to vanilla processes that have no additional isolation.
 
 %The STRETCH system \cite{10.1145/368481.368502}, albeit quite old, employs an architecture used by 
 %modern kernels to guarantee noninterference. The author describes an interruption system that can 

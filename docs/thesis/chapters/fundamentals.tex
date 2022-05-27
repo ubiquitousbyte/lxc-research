@@ -257,7 +257,7 @@ Their dedicated container runtime calls out to Sentry instead of the kernel when
     A user process can see a bundle of resources allocated to it by the kernel. The kernel guarantees that a process 
     cannot see any other resources.
     The container engine manages all containers on a single system and allocates storage and networking to create explicit paths between containers.
-    The orchestration platform talks to all engines inside a cluster of hosts.}
+    The orchestration platform talks to all engines inside a cluster to provide automatic workload management.}
     \label{images:fundamentals/cont-arch.jpg}
 \end{figure}
 However, \textcite{234857} show that network and memory allocation performance greatly suffer. 

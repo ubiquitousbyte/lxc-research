@@ -233,3 +233,190 @@ pub struct Namespace {
     typ: NamespaceType,
     path: Option<PathBuf>,
 }
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct DeviceCgroup {
+    allow: bool,
+    #[serde(rename(deserialize = "type"))]
+    typ: Option<String>,
+    major: Option<i64>,
+    minor: Option<i64>,
+    access: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct Memory {
+    limit: Option<i64>,
+    reservation: Option<i64>,
+    swap: Option<i64>,
+    kernel: Option<i64>,
+    #[serde(rename(deserialize = "kernelTCP"))]
+    kernel_tcp: Option<i64>,
+    swappiness: Option<u64>,
+    #[serde(rename(deserialize = "disableOOMKiller"))]
+    disable_oom_killer: Option<bool>,
+    #[serde(rename(deserialize = "useHierarchy"))]
+    use_hierarchy: Option<bool>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CPU {
+    shares: Option<u64>,
+    quota: Option<i64>,
+    period: Option<u64>,
+    realtime_runtime: Option<i64>,
+    realtime_period: Option<u64>,
+    cpus: Option<String>,
+    mems: Option<String>,
+    idle: Option<i64>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct ProcessLimit {
+    limit: i64,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HugePageLimit {
+    page_size: String,
+    limit: u64,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct InterfacePriority {
+    name: String,
+    priority: u32,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct BlockIODevice {
+    major: i64,
+    minor: i64,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WeightDevice {
+    major: i64,
+    minor: i64,
+    weight: Option<u16>,
+    leaf_weight: Option<u16>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct ThrottleDevice {
+    major: i64,
+    minor: i64,
+    rate: u64,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct Network {
+    #[serde(rename(deserialize = "classID"))]
+    class_id: Option<u32>,
+    #[serde(default)]
+    priorities: Vec<InterfacePriority>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Rdma {
+    hca_handles: Option<u32>,
+    hca_objects: Option<u32>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BlockIO {
+    weight: Option<u16>,
+    leaf_weight: Option<u16>,
+    #[serde(default)]
+    weight_device: Vec<WeightDevice>,
+    #[serde(default)]
+    throttle_read_bps_device: Vec<ThrottleDevice>,
+    #[serde(default)]
+    throttle_write_bps_device: Vec<ThrottleDevice>,
+    #[serde(default)]
+    throttle_read_iops_device: Vec<ThrottleDevice>,
+    #[serde(default)]
+    throttle_write_iops_device: Vec<ThrottleDevice>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Resources {
+    #[serde(default)]
+    devices: Vec<DeviceCgroup>,
+    memory: Option<Memory>,
+    cpu: Option<CPU>,
+    pids: Option<ProcessLimit>,
+    #[serde(rename(deserialize = "blockIO"))]
+    block_io: Option<BlockIO>,
+    hugepage_limits: Option<HugePageLimit>,
+    network: Option<Network>,
+    rdma: Option<Rdma>,
+    #[serde(default)]
+    unified: HashMap<String, String>,
+}
+
+pub enum SeccompAction {
+    Kill,
+    KillProcess,
+    KillThread,
+    Trap,
+    Errno,
+    Trace,
+    Allow,
+    Log,
+    Notify,
+}
+
+impl FromStr for SeccompAction {
+    type Err = NamespaceError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "SCMP_ACT_KILL" => Ok(Self::Kill),
+            "SCMP_ACT_KILL_PROCESS" => Ok(Self::KillProcess),
+            "SCMP_ACT_KILL_THREAD" => Ok(Self::KillThread),
+            "SCMP_ACT_TRAP" => Ok(Self::Trap),
+            "SCMP_ACT_ERRNO" => Ok(Self::Errno),
+            "SCMP_ACT_TRACE" => Ok(Self::Trace),
+            "SCMP_ACT_ALLOW" => Ok(Self::Allow),
+            "SCMP_ACT_LOG" => Ok(Self::Log),
+            "SCMP_ACT_NOTIFY" => Ok(Self::Notify),
+            _ => Err(NamespaceError::StrConversion),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for SeccompAction {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let typ = String::deserialize(deserializer)?;
+        let typ = typ.as_str();
+        SeccompAction::from_str(typ)
+            .map_err(|_| DeError::invalid_value(Unexpected::Str(typ), &"valid namespace type"))
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Linux {
+    #[serde(default)]
+    uid_mappings: Vec<IdMapping>,
+    #[serde(default)]
+    gid_mappings: Vec<IdMapping>,
+    #[serde(default)]
+    sysctl: HashMap<String, String>,
+    resources: Option<Resources>,
+    cgroups_path: Option<String>,
+    #[serde(default)]
+    namespaces: Vec<Namespace>,
+    #[serde(default)]
+    devices: Vec<Device>,
+}

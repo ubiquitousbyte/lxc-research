@@ -123,19 +123,28 @@ pub enum DeviceType {
     Pipe,
 }
 
+impl FromStr for DeviceType {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "c" => Ok(DeviceType::Char),
+            "b" => Ok(DeviceType::Block),
+            "u" => Ok(DeviceType::U),
+            "p" => Ok(DeviceType::Pipe),
+            _ => Err("invalid device type"),
+        }
+    }
+}
+
 impl<'de> Deserialize<'de> for DeviceType {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        match s.as_str() {
-            "c" => Ok(DeviceType::Char),
-            "b" => Ok(DeviceType::Block),
-            "u" => Ok(DeviceType::U),
-            "p" => Ok(DeviceType::Pipe),
-            other => Err(DeError::invalid_value(Unexpected::Str(other), &"^[cbup]$")),
-        }
+        let s = s.as_ref();
+        DeviceType::from_str(s).map_err(|_| DeError::invalid_value(Unexpected::Str(s), &"^[cbup]$"))
     }
 }
 

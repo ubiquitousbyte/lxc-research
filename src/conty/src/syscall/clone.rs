@@ -1,6 +1,6 @@
-use libc as c;
+use crate::syscall::Result;
 
-type Result<T> = std::result::Result<T, std::io::Error>;
+use libc as c;
 
 type CloneFn<'a> = Box<dyn FnMut() -> isize + 'a>;
 

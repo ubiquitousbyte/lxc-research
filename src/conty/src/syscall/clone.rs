@@ -13,7 +13,12 @@ type CloneFn<'a> = Box<dyn FnMut() -> isize + 'a>;
 /// excution environment. For example, the parent can place the child process
 /// in different namespaces, decice whether or the child should see its parent's
 /// file descriptor table and so on.
-pub fn clone(mut cb: CloneFn, stack: &mut [u8], flags: i32) -> Result<i32> {
+pub fn clone(
+    mut cb: CloneFn,
+    stack: &mut [u8],
+    flags: i32,
+    signal: Option<c::c_int>,
+) -> Result<i32> {
     // There are a lot of things happening here, so let me explain.
     //
     // First, cb points to a closure that can capture mutable references to memory
@@ -35,16 +40,14 @@ pub fn clone(mut cb: CloneFn, stack: &mut [u8], flags: i32) -> Result<i32> {
     // However, the clone system call expects the highest address of the stack.
     // So we need to pass in base_stack_address + stack_length to clone
 
-    extern "C" fn callback(c: *mut CloneFn) -> c::c_int {
-        let f: &mut CloneFn = unsafe { &mut *c };
-        // Dereference the function, call it and cast the result
-        (*f)() as c::c_int
+    extern "C" fn callback(f: *mut c::c_void) -> c::c_int {
+        unsafe {
+            let f: *mut Box<dyn FnMut() -> isize> = std::mem::transmute(f);
+            (*f)() as c::c_int
+        }
     }
 
     let pid = unsafe {
-        // Cast the callback to what clone expects
-        let f: extern "C" fn(*mut c::c_void) -> c::c_int =
-            std::mem::transmute(callback as extern "C" fn(*mut Box<dyn FnMut() -> isize>) -> i32);
         // Stack grows downwards, so add the stack length
         let ptr = stack.as_mut_ptr().add(stack.len());
         // Will we break the ABI if ptr is unaligned because of stack.len() ?
@@ -53,9 +56,9 @@ pub fn clone(mut cb: CloneFn, stack: &mut [u8], flags: i32) -> Result<i32> {
         let ptr_aligned = ptr.sub(ptr as usize % 16);
         // Finally, create the child
         c::clone(
-            f,
+            callback,
             ptr_aligned as *mut c::c_void,
-            flags,
+            flags | signal.unwrap_or(0),
             // We pass in the closure as the *void parameter to f
             &mut cb as *mut _ as *mut c::c_void,
         )

@@ -68,7 +68,9 @@ impl std::fmt::Display for Namespace {
 }
 
 fn main() {
-    let child_func = || {
+    let child_func = move || {
+        unsafe { c::sleep(5) };
+
         if let Err(mount_result) = mount_proc() {
             println!("Could not mount procfs in child: {}", mount_result);
             return 1;
@@ -86,7 +88,7 @@ fn main() {
     };
 
     const STACK_SIZE: usize = 4 * 1024 * 1024;
-    let ref mut stack: [u8; STACK_SIZE] = [0; STACK_SIZE];
+    let mut stack: [u8; STACK_SIZE] = [0; STACK_SIZE];
     let flags = c::CLONE_NEWUSER
         | c::CLONE_NEWUTS
         | c::CLONE_NEWNET
@@ -95,8 +97,17 @@ fn main() {
         | c::CLONE_NEWCGROUP
         | c::CLONE_NEWPID;
 
-    let result = syscall::clone(Box::new(child_func), stack, flags);
-    if let Err(clone_result) = result {
+    let pid = syscall::clone(Box::new(child_func), &mut stack, flags, Some(c::SIGCHLD));
+    if let Err(clone_result) = &pid {
         println!("Could not create execution environment: {}", clone_result);
     }
+
+    let pid = pid.unwrap();
+    println!("Waiting for child {}", pid);
+
+    let mut status: c::c_int = 0;
+
+    while unsafe { c::waitpid(pid, &mut status, 0) } > 0 {}
+
+    println!("Child exited");
 }

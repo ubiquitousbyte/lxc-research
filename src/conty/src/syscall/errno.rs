@@ -12,6 +12,8 @@ macro_rules! impl_is_minus_one {
 
 impl_is_minus_one! { i8 i16 i32 i64 isize }
 
+/// errno checks if T is minus one and returns the value of _errno_location
+/// if that is the case
 pub fn errno<T: IsMinusOne>(t: T) -> std::io::Result<T> {
     if t.is_minus_one() {
         Err(std::io::Error::last_os_error())

@@ -2,27 +2,32 @@ use crate::syscall::errno::errno;
 
 use libc as c;
 
+/// Pid is a wrapper around a c pid_t
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Pid(c::pid_t);
 
 impl Pid {
+    /// current returns the process identifier of the current process
     pub fn current() -> Self {
         Self {
             0: unsafe { c::getpid() },
         }
     }
 
+    /// parent returns the process identifier of the parent process
     pub fn parent() -> Self {
         Self {
             0: unsafe { c::getppid() },
         }
     }
 
+    /// as_raw_pid returns the raw process identifier of self
     pub fn as_raw_pid(self) -> c::pid_t {
         self.0
     }
 }
 
+/// Wraps a c::pid_t into a Pid
 impl From<c::pid_t> for Pid {
     fn from(pid: c::pid_t) -> Self {
         Self { 0: pid }

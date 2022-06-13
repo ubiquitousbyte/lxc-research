@@ -1,3 +1,4 @@
+use crate::syscall::ffi::errno;
 use crate::syscall::Result;
 
 use libc as c;
@@ -41,10 +42,8 @@ pub fn clone(
     // So we need to pass in base_stack_address + stack_length to clone
 
     extern "C" fn callback(f: *mut c::c_void) -> c::c_int {
-        unsafe {
-            let f: *mut Box<dyn FnMut() -> isize> = std::mem::transmute(f);
-            (*f)() as c::c_int
-        }
+        let cb = unsafe { &mut *(f as *mut Box<dyn FnMut() -> isize>) };
+        (*cb)() as c::c_int
     }
 
     let pid = unsafe {
@@ -64,8 +63,5 @@ pub fn clone(
         )
     };
 
-    match pid {
-        -1 => Err(std::io::Error::last_os_error()),
-        n => Ok(n),
-    }
+    errno(pid)
 }

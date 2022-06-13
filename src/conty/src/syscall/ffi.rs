@@ -1,21 +1,9 @@
-pub trait IsMinusOne {
-    fn is_minus_one(&self) -> bool;
-}
+use std::ffi::{CString, OsStr};
 
-macro_rules! impl_is_minus_one {
-    ($($t:ident)*) => ($(impl IsMinusOne for $t {
-        fn is_minus_one(&self) -> bool {
-            *self == -1
-        }
-    })*)
-}
+use std::io::{Error, ErrorKind, Result};
 
-impl_is_minus_one! { i8 i16 i32 i64 isize }
-
-pub fn errno<T: IsMinusOne>(t: T) -> std::io::Result<T> {
-    if t.is_minus_one() {
-        Err(std::io::Error::last_os_error())
-    } else {
-        Ok(t)
-    }
+pub fn into_c_string<S: AsRef<OsStr>>(s: S) -> Result<CString> {
+    use std::os::unix::ffi::OsStrExt;
+    let s = s.as_ref();
+    CString::new(s.as_bytes()).map_err(|e| Error::new(ErrorKind::InvalidInput, e))
 }

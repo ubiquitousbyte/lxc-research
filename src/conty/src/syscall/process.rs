@@ -1,6 +1,39 @@
-use crate::syscall::ffi::errno;
+use crate::syscall::errno::errno;
 
 use libc as c;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Pid(c::pid_t);
+
+impl Pid {
+    pub fn current() -> Self {
+        Self {
+            0: unsafe { c::getpid() },
+        }
+    }
+
+    pub fn parent() -> Self {
+        Self {
+            0: unsafe { c::getppid() },
+        }
+    }
+
+    pub fn as_raw_pid(self) -> c::pid_t {
+        self.0
+    }
+}
+
+impl From<c::pid_t> for Pid {
+    fn from(pid: c::pid_t) -> Self {
+        Self { 0: pid }
+    }
+}
+
+impl std::fmt::Display for Pid {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 type CloneFn<'a> = Box<dyn FnMut() -> isize + 'a>;
 
@@ -8,7 +41,9 @@ type CloneFn<'a> = Box<dyn FnMut() -> isize + 'a>;
 /// pointed to the argument cb.
 /// When the function returns, the child process terminates.
 /// The integer returned by cb is the exit status for the child process.
+///
 /// The stack argument specifies the location of the stack used by the child process.
+///
 /// Using the flags argument, the caller can control various properties of the child's
 /// excution environment. For example, the parent can place the child process
 /// in different namespaces, decice whether or the child should see its parent's
@@ -18,7 +53,7 @@ pub fn clone(
     stack: &mut [u8],
     flags: i32,
     signal: Option<c::c_int>,
-) -> std::io::Result<i32> {
+) -> std::io::Result<Pid> {
     // There are a lot of things happening here, so let me explain.
     //
     // First, cb points to a closure that can capture mutable references to memory
@@ -62,5 +97,11 @@ pub fn clone(
         )
     };
 
-    errno(pid)
+    let pid = errno(pid)?;
+    Ok(pid.into())
+}
+
+pub fn fork() -> std::io::Result<Pid> {
+    let pid = errno(unsafe { c::fork() })?;
+    Ok(pid.into())
 }

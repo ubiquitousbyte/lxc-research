@@ -1,5 +1,3 @@
-use crate::syscall::Result;
-
 pub trait IsMinusOne {
     fn is_minus_one(&self) -> bool;
 }

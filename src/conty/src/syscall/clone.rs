@@ -1,5 +1,4 @@
 use crate::syscall::ffi::errno;
-use crate::syscall::Result;
 
 use libc as c;
 
@@ -19,7 +18,7 @@ pub fn clone(
     stack: &mut [u8],
     flags: i32,
     signal: Option<c::c_int>,
-) -> Result<i32> {
+) -> std::io::Result<i32> {
     // There are a lot of things happening here, so let me explain.
     //
     // First, cb points to a closure that can capture mutable references to memory

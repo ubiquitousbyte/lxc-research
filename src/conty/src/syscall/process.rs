@@ -68,7 +68,7 @@ pub fn clone(
     // a function pointer of the form int (*f)(*void) where void is an arbitrary argument.
     // We can, however, pass the pointer to the closure as the argument to an int (*f)(*void),
     // unwrap it, call it and return its result, thereby making it compatible with the C ABI.
-    // This is what callback and f do.
+    // This is what callback does.
     //
     // Secondly, glibc requires that the parent process provide a stack for the child.
     // glibc will transparently push the function pointer onto the stack and call
@@ -97,7 +97,7 @@ pub fn clone(
             callback,
             ptr_aligned as *mut c::c_void,
             flags | signal.unwrap_or(0),
-            // We pass in the closure as the *void parameter to f
+            // We pass in the closure as the *void parameter to callback
             &mut cb as *mut _ as *mut c::c_void,
         )
     };

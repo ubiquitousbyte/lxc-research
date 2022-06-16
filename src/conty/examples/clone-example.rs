@@ -84,6 +84,8 @@ fn main() {
             return 1;
         }
 
+        println!("Done");
+
         return 0;
     };
 
@@ -107,7 +109,5 @@ fn main() {
 
     let mut status: c::c_int = 0;
 
-    while unsafe { c::waitpid(pid, &mut status, 0) } > 0 {}
-
-    println!("Child exited");
+    while unsafe { c::waitpid(pid.as_raw_pid(), &mut status, 0) } > 0 {}
 }

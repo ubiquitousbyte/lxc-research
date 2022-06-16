@@ -1,6 +1,6 @@
-use crate::syscall::{errno::errno, ffi};
+use crate::syscall::errno::errno;
 
-use std::ffi::OsStr;
+use std::ffi::CStr;
 
 use libc as c;
 
@@ -8,15 +8,15 @@ use libc as c;
 /// onto the (sub)tree of the file hierarchy defined by destination.
 /// fstype specifies the type of the filesystem that source manages
 /// See mount(2) for a description of flags
-pub fn mount<S: AsRef<OsStr>>(
+pub fn mount<S: AsRef<CStr>>(
     source: S,
     destination: S,
     fstype: S,
     flags: u64,
 ) -> std::io::Result<i32> {
-    let source = ffi::into_c_string(source)?;
-    let destination = ffi::into_c_string(destination)?;
-    let fstype = ffi::into_c_string(fstype)?;
+    let source = source.as_ref();
+    let destination = destination.as_ref();
+    let fstype = fstype.as_ref();
 
     errno(unsafe {
         c::mount(

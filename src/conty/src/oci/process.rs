@@ -1,4 +1,4 @@
-use crate::oci::{Capabilities, User};
+use crate::oci::{Capabilities, ResourceLimit, User};
 
 use std::path::PathBuf;
 
@@ -32,9 +32,9 @@ pub struct Process {
     pub args: Vec<String>,
     // Resource limits to apply to the process
     // If the vector has elements that refer to the same resource limit,
-    // an error must be generate
-    // #[serde(default)]
-    // pub rlimits: Vec<ResourceLimit>,
+    // an error must be generated
+    #[serde(default)]
+    pub rlimits: Vec<ResourceLimit>,
     // The capabilities of the process
     // OCI states that the runtime should not fail if the container configuration
     // requests capabilites that cannot be granted

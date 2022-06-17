@@ -13,10 +13,15 @@ pub fn mount<S: AsRef<CStr>>(
     destination: S,
     fstype: S,
     flags: u64,
+    data: Option<S>,
 ) -> std::io::Result<i32> {
     let source = source.as_ref();
     let destination = destination.as_ref();
     let fstype = fstype.as_ref();
+
+    let data = data
+        .map(|d| d.as_ref().as_ptr())
+        .unwrap_or(std::ptr::null());
 
     errno(unsafe {
         c::mount(
@@ -24,7 +29,7 @@ pub fn mount<S: AsRef<CStr>>(
             destination.as_ptr(),
             fstype.as_ptr(),
             flags,
-            std::ptr::null(),
+            data as *const c::c_void,
         )
     })
 }

@@ -140,31 +140,6 @@ In addition, hardware optimisations such as direct memory access are emulated in
 further degrades performance. This, however, can be mitigated by integrating an input-output memory management 
 unit that remaps all direct memory accesses of a device on the host to an address space in the guest.
 
-%\begin{figure}
-%    \centering
-%        \begin{subfigure}[b]{0.45\textwidth}
-%            \centering
-%            \includegraphics[width=0.6\textwidth]{images/fundamentals/kernel-virt-arch.jpg}
-%            \caption{Virtualisation using a shared kernel that constantly assures noninterference by 
-%                    handling service requests from user processes. Kernel has full control of the system
-%                    and represents a single point of failure. There are no mechanisms to reestablsh 
-%                    system health.}
-%            \label{images:fundamentals/kernel-virt-arch.jpg}
-%        \end{subfigure}%
-%        \hfill
-%        \begin{subfigure}[b]{0.45\textwidth}
-%            \centering
-%            \includegraphics[width=0.6\textwidth]{images/fundamentals/full-virt-arch.jpg}
-%            \caption{Virtualisation using multiple independent kernels, each ensuring noninterference. 
-%                    If one kernel fails, the virtual machine monitor can reclaim the respective resources or 
-%                    perform operations that reconstruct the virtual machine's state from a health checkpoint.}
-%            \label{images:fundamentals/full-virt-arch.jpg}
-%        \end{subfigure}
-%    \caption{Architectural comparison between operating-system virtualisation (\ref{images:fundamentals/kernel-virt-arch.jpg})
-%             and hardware virtualisation using a virtual machine monitor (\ref{images:fundamentals/full-virt-arch.jpg})}
-%    \label{images:fundamentals/virt-arch}
-%\end{figure}
-
 The cost of hardware virtualisation becomes apparent when measuring same-host density
 and boot times. \textcite{10.1145/3132747.3132763} consider memory consumption and on-disk image size
 as the primary limiting factors. The authors measure the time it takes to create and boot
@@ -265,4 +240,16 @@ This can be partially attributed to the fact that the Sentry process is implemen
 and lacks the fine-grained optimisations contained in the Linux kernel.
 \textcite{246288} take a different approach and try to fuse the security of virtual machines 
 with the performance of containers by programming a custom virtual machine monitor 
-called Firecracker that runs on top of KVM.  
+called Firecracker that runs on top of KVM. Firecracker completely relies on the
+Linux kernel for memory management, CPU scheduling and block I/O. To reduce its attack surface,
+the virtual machine monitor sacrifices portability by supporting a limited set of emulated 
+network and block devices. To further strengthen the noninterference boundary, the devices 
+have configurable built-in rate limiters that can control the number of operations per second, e.g
+disk/packets per second. Unlike a traditional container runtime, Firecracker's rate-limiting implementation
+does not rely on the kernel, which makes its isolation boundary to the kernel stronger. 
+\textcite{10.1145/3381052.3381315} evaluate both gVisor and Firecracker and show that 
+the latter \enquote{[...] is effective at reducing the frequency of kernel code invocations, but had 
+a much smaller impact on reducing the footprint of kernel code} \cite[12]{10.1145/3381052.3381315}. 
+\clearpage
+
+\section{Processes}

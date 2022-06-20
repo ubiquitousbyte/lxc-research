@@ -253,8 +253,32 @@ a much smaller impact on reducing the footprint of kernel code} \cite[12]{10.114
 \clearpage
 
 \section{Processes}
-A process refers to a program in execution.
- 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.2\textwidth]{images/fundamentals/proc-mem-layout.jpg}
+    \caption{Memory layout of a process \cite{10.5555/2490781}}
+    \label{images:fundamentals/proc-mem-layout}
+\end{figure}
+
+A process is the primary unit of work in a computer system. It represents a program 
+in execution. The kernel partitions the memory of a process into multiple sections shown in 
+Figure \ref{images:fundamentals/proc-mem-layout}. The text section is a static 
+read-only memory segment that contains the set of executable instructions that the program 
+compiles down to. When the program is first scheduled for execution, it becomes a process. 
+The central processing unit jumps to a starting memory address in the text section and starts 
+executing the process from there. The data section contains globally defined variables that can be
+referenced throughout the entire lifecycle of the process. Similarly to the text section, 
+the data section is static, i.e it does not grow or shrink. 
+The heap contains memory that is allocated during runtime as per demand. The process itself is responsible 
+for releasing any memory acquired from the heap. The latter is important for two reasons. 
+First, the heap grows upwards and may overlap with the stack. Second, a Unix system usually 
+has a system-wide heap from which processes acquire memory. If a long-running process executes 
+operations that acquire heap memory but fail to release it, the whole system may eventually run out 
+of heap memory - an example of spatial interference. 
+The stack is a data structure that acts as temporary storage for a process.
+Whenever a process calls a function, that function's parameters, local variables and return address 
+are pushed onto the stack. When the function returns control to the caller, these values are popped of. 
+
 
 \subsection{Creation}
 \subsection{Termination}

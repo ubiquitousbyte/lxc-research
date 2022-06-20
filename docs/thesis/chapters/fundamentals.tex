@@ -271,8 +271,8 @@ referenced throughout the entire lifecycle of the process. Similarly to the text
 the data section is static, i.e it does not grow or shrink. 
 The heap contains memory that is allocated during runtime as per demand. The process itself is responsible 
 for releasing any memory acquired from the heap. The latter is important for two reasons. 
-First, the heap grows upwards and may overlap with the stack. Second, a Unix system usually 
-has a system-wide heap from which processes acquire memory. If a long-running process executes 
+First, the heap grows upwards and may overlap with the stack. Second, most operating systems 
+employ a system-wide heap from which processes acquire memory. If a long-running process executes 
 operations that acquire heap memory but fail to release it, the whole system may eventually run out 
 of heap memory - an example of spatial interference. 
 The stack is a data structure that acts as temporary storage for a process.

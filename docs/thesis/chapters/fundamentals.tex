@@ -255,33 +255,71 @@ a much smaller impact on reducing the footprint of kernel code} \cite[12]{10.114
 \section{Processes}
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.2\textwidth]{images/fundamentals/proc-mem-layout.jpg}
+    \includegraphics[width=0.6\textwidth]{images/fundamentals/proc-mem-layout.jpg}
     \caption{Memory layout of a process \cite{10.5555/2490781}}
     \label{images:fundamentals/proc-mem-layout}
 \end{figure}
 
-A process is the primary unit of work in a computer system. It represents a program 
-in execution. The kernel partitions the memory of a process into multiple sections shown in 
-Figure \ref{images:fundamentals/proc-mem-layout}. The text section is a static 
-read-only memory segment that contains the set of executable instructions that the program 
-compiles down to. When the program is first scheduled for execution, it becomes a process. 
-The central processing unit jumps to a starting memory address in the text section and starts 
-executing the process from there. The data section contains globally defined variables that can be
-referenced throughout the entire lifecycle of the process. Similarly to the text section, 
-the data section is static, i.e it does not grow or shrink. 
-The heap contains memory that is allocated during runtime as per demand. The process itself is responsible 
-for releasing any memory acquired from the heap. The latter is important for two reasons. 
-First, the heap grows upwards and may overlap with the stack. Second, most operating systems 
-employ a system-wide heap from which processes acquire memory. If a long-running process executes 
-operations that acquire heap memory but fail to release it, the whole system may eventually run out 
-of heap memory - an example of spatial interference. 
-The stack is a data structure that acts as temporary storage for a process.
-Whenever a process calls a function, that function's parameters, local variables and return address 
-are pushed onto the stack. When the function returns control to the caller, these values are popped of. 
+A process is the primary unit of work in a computer system. It represents a program in execution. 
+The kernel partitions the linear address space of a process into multipe regions shown in Figure 
+\ref{images:fundamentals/proc-mem-layout}. The address space itself is encapsulated in a 
+memory descriptor type called \verb|mm_struct| \cite{include/linux/mm_types.h} and 
+every process is associated with one or more instances of that type. The text 
+segment of the address space is a read-only memory section that contains the set of executable 
+instructions that the program compiles down to \cite{10.5555/2490781}. When the program is 
+first scheduled for execution, the central processing unit jumps to the text section's 
+initial memory address, which is stored in the \verb|start_code| field of the process's memory descriptor
+and starts executing from there until it reaches the final linear address \verb|end_code|.
+The data section contains globally defined variables that can be referenced throughout the 
+entire lifecycle of the process \cite{10.5555/2490781}. The data section is further deconstructed 
+into uninitialised and initialised subsections. Similarly to the text section, it
+does not grow or shrink because its size is known at program startup and does not change. 
+The \verb|start_data| and \verb|end_data| fields in the memory descriptor refer to the 
+contiguous memory region that represents the initialised data region. 
+The heap segment contains memory that is allocated during runtime as per demand. The process 
+itself is responsible for releasing any memory acquired from the heap. The latter is important for two 
+reasons. First, the heap grows upwards towards the stack and may overlap with it. Second, 
+memory allocation interfaces such as \verb|malloc| acquire memory from a system-wide pool. If a 
+long-running process acquires dynamic memory but fails to release it, the whole system will 
+eventually run out of memory - an example of spatial interference. The kernel tracks the heap areas 
+allocated to a particular process via the \verb|start_brk| and \verb|brk| fields of the memory 
+descriptor which denote its initial and final linear addresses, respectively. 
+The stack is a data structure that acts as temporary storage for a process. Whenever 
+a process calls a function, that function's parameters, local variables and return address are pushed 
+onto the stack. When the function returns control to the caller, these values are popped of \cite{10.5555/2490781}.
+The stack grows downwards towards lower addresses and its starting address \verb|start_stack|
+sits right above the \verb|main()| function's return address. 
 
+A process is associated with a state object that dynamically changes as it executes.
+On Linux, the state object is a simple unsigned integer that can hold 
+any of the values listed in Table \ref{table:proc-states}.
+
+\begin{table}[h!]
+    \centering
+    \begin{tabular}{ |m{4cm}|m{20em}| }
+        \hline
+        State identifier & Description \\
+        \hline
+        \verb|TASK_RUNNING| & The process is being executed by a CPU or is waiting to be assigned to one \\
+        \hline 
+        \verb|TASK_UNINTERRUPTIBLE| & The process is waiting for an event or a resource and cannot be interrupted by a signal while doing so \\
+        \hline
+        \verb|TASK_INTERRUPTIBLE| & The process is waiting for an event or a resource and can be interrupted by a signal while doing so \\
+        \hline
+        \verb|TASK_NEW| & The process has been created but it cannot be scheduled for execution and it cannot react to events \\
+        \hline
+        \verb|TASK_DEAD| & The process is being cleaned up and deleted \\
+        \hline
+    \end{tabular}
+    \caption{Table of most important process states in Linux derived from \cite{include/linux/sched.h} and \cite{kernel/sched/core.c}}
+    \label{table:proc-states}
+\end{table}
 
 \subsection{Creation}
+\label{ch:fundamentals/processes/creation}
 \subsection{Termination}
 \subsection{Monitoring}
+\subsection{Communication}
+\label{ch:fundamentals/processes/communication}
 \subsection{Resource Management}
 \subsection{Security}

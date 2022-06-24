@@ -260,8 +260,20 @@ a much smaller impact on reducing the footprint of kernel code} \cite[12]{10.114
     \label{images:fundamentals/proc-mem-layout}
 \end{figure}
 
-A process is the primary unit of work in a computer system. It represents a program in execution. 
-The kernel partitions the linear address space of a process into multipe regions shown in Figure 
+A process is the fundamental abstraction of operating-system virtualisation.  
+It is the primary unit of work in a computer system and rerpesents a program in execution.
+This chapter introduces various aspects of a process - how it is laid out in memory 
+(Chapter \ref{ch:fundamentals/processes/memory-layout}), how it is scheduled for execution 
+(Chapter \ref{ch:fundamentals/processes/execution-scheduling}), and the system call interface for 
+creating, terminating, monitoring and protecting processes from each other 
+(Chapters \ref{ch:fundamentals/processes/creation}, \ref{ch:fundamentals/processes/termination},
+\ref{ch:fundamentals/processes/monitoring}, \ref{ch:fundamentals/processes/resource-management}, 
+\ref{ch:fundamentals/processes/security}).
+
+
+\subsection{Memory Layout}
+\label{ch:fundamentals/processes/memory-layout}
+The kernel partitions the virtual address space of a process into multipe regions shown in Figure 
 \ref{images:fundamentals/proc-mem-layout}. The address space itself is encapsulated in a 
 memory descriptor type called \verb|mm_struct| \cite{include/linux/mm_types.h} and 
 every process is associated with one or more instances of that type. The text 
@@ -290,6 +302,17 @@ onto the stack. When the function returns control to the caller, these values ar
 The stack grows downwards towards lower addresses and its starting address \verb|start_stack|
 sits right above the \verb|main()| function's return address. 
 
+Note that the virtual address space of the process is sparse because it contains a hole between the 
+stack and the heap that will require physical pages only if those two segments grow. This hole may be
+utilised to bring in page frames that can be shared between processes in order to reduce memory 
+consumption and to allow two processes to communicate with each other. This has positive implications
+on same-host density - a key performance metric for container runtimes. For example, the \verb|libc|
+library is reentrant and can be brought into physical memory only once. The memory descriptor of a 
+process that depends on \verb|libc| does not have to load its own copy of the library into memory. 
+Instead, all processes can refer to the same physical frames. 
+
+\subsection{Execution Scheduling}
+\label{ch:fundamentals/processes/execution-scheduling}
 A process is associated with a state object that dynamically changes as it executes.
 On Linux, the state object is a simple unsigned integer that can hold 
 any of the values listed in Table \ref{table:proc-states}.
@@ -318,8 +341,12 @@ any of the values listed in Table \ref{table:proc-states}.
 \subsection{Creation}
 \label{ch:fundamentals/processes/creation}
 \subsection{Termination}
+\label{ch:fundamentals/processes/termination}
 \subsection{Monitoring}
+\label{ch:fundamentals/processes/monitoring}
 \subsection{Communication}
 \label{ch:fundamentals/processes/communication}
 \subsection{Resource Management}
+\label{ch:fundamentals/processes/resource-management}
 \subsection{Security}
+\label{ch:fundamentals/processes/security}

@@ -261,7 +261,7 @@ a much smaller impact on reducing the footprint of kernel code} \cite[12]{10.114
 \end{figure}
 
 A process is the fundamental abstraction of operating-system virtualisation.  
-It is the primary unit of work in a computer system and rerpesents a program in execution.
+It is the primary unit of work in a computer system and represents a program in execution.
 This chapter introduces various aspects of a process - how it is laid out in memory 
 (Chapter \ref{ch:fundamentals/processes/memory-layout}), how it is scheduled for execution 
 (Chapter \ref{ch:fundamentals/processes/execution-scheduling}), and the system call interface for 
@@ -287,7 +287,7 @@ entire lifecycle of the process \cite{10.5555/2490781}. The data section is furt
 into uninitialised and initialised subsections. Similarly to the text section, it
 does not grow or shrink because its size is known at program startup and does not change. 
 The \verb|start_data| and \verb|end_data| fields in the memory descriptor refer to the 
-contiguous memory region that represents the initialised data region. 
+contiguous memory region that represents the initialised data. 
 The heap segment contains memory that is allocated during runtime as per demand. The process 
 itself is responsible for releasing any memory acquired from the heap. The latter is important for two 
 reasons. First, the heap grows upwards towards the stack and may overlap with it. Second, 
@@ -309,7 +309,8 @@ consumption and to allow two processes to communicate with each other. This has 
 on same-host density - a key performance metric for container runtimes. For example, the \verb|libc|
 library is reentrant and can be brought into physical memory only once. The memory descriptor of a 
 process that depends on \verb|libc| does not have to load its own copy of the library into memory. 
-Instead, all processes can refer to the same physical frames. 
+Instead, its page table entries can map to the same physical frames that all other processes refer to 
+when using the library.
 
 \subsection{Execution Scheduling}
 \label{ch:fundamentals/processes/execution-scheduling}

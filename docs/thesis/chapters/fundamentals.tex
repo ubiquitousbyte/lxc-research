@@ -305,19 +305,33 @@ sits right above the \verb|main()| function's return address.
 Note that the virtual address space of the process is sparse because it contains a hole between the 
 stack and the heap that will require physical pages only if those two segments grow. This hole may be
 utilised to bring in page frames that can be shared between processes in order to reduce memory 
-consumption and to allow two processes to communicate with each other. This has positive implications
-on same-host density - a key performance metric for container runtimes. For example, the \verb|libc|
+consumption and to allow two processes to communicate with each other. For example, the \verb|libc|
 library is reentrant and can be brought into physical memory only once. The memory descriptor of a 
 process that depends on \verb|libc| does not have to load its own copy of the library into memory. 
 Instead, its page table entries can map to the same physical frames that all other processes refer to 
-when using the library.
+when using the library. This reduces memory consumption and therefore has positive implications 
+on same-host density. 
 
-\subsection{Execution Scheduling}
+\subsection{Scheduling}
 \label{ch:fundamentals/processes/execution-scheduling}
-A process is associated with a state object that dynamically changes as it executes.
-On Linux, the state object is a simple unsigned integer that can hold 
-any of the values listed in Table \ref{table:proc-states}.
-
+Systems running more than one process rely on a process scheduler to determine, in real-time, 
+which process should use the processing unit such that all processes do meaningful work 
+and the core does not idle. Every process on Linux is represented as a \verb|task_struct| \cite{include/linux/sched.h} 
+which contains various bits of information such as the process's memory descriptor, the table of 
+open file descriptors, the running state of the process (see Table \ref{table:proc-states}), 
+references to its child processes and parent process, its pending signals and so on. 
+The process scheduler maintains a  queue of all processes that are currently 
+being executed by a processing unit or are waiting to be assigned to one. 
+This queue is represented in memory as a circular doubly linked-list of \verb|task_struct| 
+objects and is called the running queue because all of its tasks are in the \verb|TASK_RUNNING| state.
+The kernel keeps a global pointer \verb|current| to the current task being executed by a processing unit. 
+It is the scheduler's job to determine the most optimal sequence of processes to schedule from the running queue 
+onto the processing unit in order to satisfy two conflicting requirements - low latency and high throughput. 
+Low latency is crutial for processes that mostly perform input-output operations. 
+Fetching data from a device, such as a network card, typically takes multiple CPU cycles. 
+For this reason, the scheduler moves a task currently waiting for an external event from the running queue 
+into the wait queue and updates the \verb|current| pointer to point to a different process. 
+This operation is known as preemption. 
 \begin{table}[h!]
     \centering
     \begin{tabular}{ |m{4cm}|m{20em}| }
@@ -338,6 +352,64 @@ any of the values listed in Table \ref{table:proc-states}.
     \caption{Table of most important process states in Linux derived from \cite{include/linux/sched.h} and \cite{kernel/sched/core.c}}
     \label{table:proc-states}
 \end{table}
+The wait queue consists of all processes currently waiting for data or a signal.
+Their state is always either \verb|TASK_INTERRUPTIBLE| or \verb|TASK_UNINTERRUPTIBLE|.
+In order for an input-output bound process to make meaningful progress, it needs to be frequently 
+rescheduled back onto the processing unit. 
+Conversely, high throughput is important for processes that are primarily executing computations.
+These processes make the most progress by monopolising the processing unit. Hence, 
+low-latency and high throughput are incongruous. Operating systems manage 
+this incongruity by ranking processes based on their priority and allocating timeslices that 
+determine how long a task can run until it is preempted. 
+
+On Linux, every \verb|task_struct| is associated with a \verb|sched_entity| object that holds task-related 
+statistics used by the scheduler to do its job. The most important properties of this object 
+are the \verb|weight| and \verb|vruntime| fields. The former represents 
+a priority value that measures the task's willingness to be preempted. In other words, it represents 
+how \enquote{nice} a process is to all other processes on the system. The value ranges from $-20$
+to $19$ with a default of $0$. Larger values correspond to lower priorities and smaller values correspond 
+to higher priorities. The \verb|vruntime| (virtual runtime) field denotes the amount of time already 
+allocated to the task. The invariant that the scheduler tries to enforce is that the process with the 
+smallest virtual runtime should be the one that is currently using the processing unit. By definition,
+the process with the smallest virtual runtime is also the process that has used the processing unit
+the least. For this reason, the scheduler is said to be completely fair. 
+Whenever the runtime queue is updated, either by an interrupt triggered by the system timer or a 
+change in a task's state, the virtual runtime of the task is incremented by a weighted delta
+\begin{equation}
+    d = e * w / \sum_{i = 0}^{n} w_{i}
+\end{equation}
+where $e$ refers to the amount of time the task used the central processing unit 
+since the last time the running queue was updated. 
+$w$ corresponds to the priority value of the task. $n$ denotes the length of the running queue. 
+The sum in the expression aggregates the priority values of all tasks in the queue. 
+Hence, dividing $w$ by the sum gives us a proxy of the task's priority relative to all 
+other tasks in the queue. 
+
+%The Linux kernel has a priority value that measures a 
+%process's willingness to be preempted. In other words, it represents how \enquote{nice} a process 
+%is to all other processes on the system. The value ranges from $-20$ to $19$ with a default of $0$.
+%Larger values correspond to lower priorities and smaller values correspond to higher priorities.
+%The scheduler does not allocate a timeslice per process.
+%Instead, it calculates how long a process should run as a function 
+%\begin{equation}
+%    f(n) = \sum_{i = 0}^{n} rq[i].priority
+%\end{equation}
+%of the number of currently runnable processes $n$, i.e the length of the running queue. 
+%$f(n)$ sums the priority values of all tasks in the running queue $rq$ and denotes the queue's weight.
+%The scheduler maintains the amount of time (in microseconds) allocated to a task and calls it 
+%the task's virtual runtime. Whenever the system timer triggers an interrupt, the virtual runtime 
+%of every task is updated.
+
+%Instead, it calculates how long a process should run as a function of the number of currently 
+%runnable processes, i.e the length of the running queue. The sum of all nice values for all processes
+%in the running queue is used to compute the 
+
+%The kernel uses the nice value as a weight to determine the amount of processor time a process 
+%can consume. Whenever a task joins the running queue, the kernel checks if the currently running 
+%process has consumed a larger proportion of the processor than the new process. If that is the case,
+%it preempts the current process in favour of the new process. The scheduler is said to be 
+%completely fair as it always attempts to give all processes a fair proportion of the processor.
+
 
 \subsection{Creation}
 \label{ch:fundamentals/processes/creation}

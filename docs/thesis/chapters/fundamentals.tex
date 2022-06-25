@@ -362,7 +362,7 @@ Conversely, high throughput is important for processes that are primarily execut
 These processes make the most progress by monopolising the processing unit. Hence, 
 low-latency and high throughput are incongruous. Operating systems manage 
 this incongruity by ranking processes based on their priority and allocating timeslices that 
-determine how long a task can run until it is preempted. 
+determine how long a task can run until it is preempted.
 
 On Linux, every \verb|task_struct| is associated with a \verb|sched_entity| object that holds task-related 
 statistics used by the scheduler to do its job. The most important properties of this object 
@@ -379,48 +379,30 @@ Whenever the run queue is updated, either by an interrupt triggered by the syste
 change in a task's state, the virtual runtime of the task is incremented by a weighted delta
 \begin{equation}
     d = e \times w / \sum_{i = 0}^{n} w_{i}
+    \label{equation:fundamentals/cfs-scheduler-delta}
 \end{equation}
 where $e$ refers to the amount of time the task used the central processing unit 
 since the last time the run queue was updated. 
 $w$ corresponds to the priority value of the task. $n$ denotes the length of the run queue. 
 The sum in the expression aggregates the priority values of all tasks in the queue. 
 Hence, dividing $w$ by the sum gives us a proxy of the task's priority relative to all 
-other tasks in the queue. In other words, $d$ equals the amount of time the task used 
-the processing unit multiplied by its relative priority of task in the entire run queue.
+other tasks in the queue. Recall that the scheduler monotonically increases the virtual runtime 
+of the process by $d$. A process that performs a lot of input-output operations exhibits small 
+processing unit bursts, hence $e$ is smaller. Therefore, the virtual runtime for that process 
+will increase more slowly and the process will be scheduled more frequently for execution. 
+Similarly, if the process has a high priority, i.e $w$ is small, 
+the division in Equation \ref{equation:fundamentals/cfs-scheduler-delta} will result in a small fraction 
+that will cancel out a big portion of $e$ when multiplied. 
 
-The \verb|sched_entity| object of every process is also part of a 
-a red-black tree whose search key is set to the virtual runtime property. Whenever the scheduler 
-needs to schedule a new process for execution, it traverses the tree and finds the task with the 
-lowest virtual runtime, which is always stored at the leftmost leaf node of the tree. 
-The complexity of this operation equals the depth of the tree, i.e it takes $\Theta{(n\log{n})}$.
-The scheduler uses a caching mechanism to store the leftmost node whenever a task is enqueued to the run queue, 
-thereby reducing the traversal's cost to $\Theta{(1)}$.
-
-%The Linux kernel has a priority value that measures a 
-%process's willingness to be preempted. In other words, it represents how \enquote{nice} a process 
-%is to all other processes on the system. The value ranges from $-20$ to $19$ with a default of $0$.
-%Larger values correspond to lower priorities and smaller values correspond to higher priorities.
-%The scheduler does not allocate a timeslice per process.
-%Instead, it calculates how long a process should run as a function 
-%\begin{equation}
-%    f(n) = \sum_{i = 0}^{n} rq[i].priority
-%\end{equation}
-%of the number of currently runnable processes $n$, i.e the length of the running queue. 
-%$f(n)$ sums the priority values of all tasks in the running queue $rq$ and denotes the queue's weight.
-%The scheduler maintains the amount of time (in microseconds) allocated to a task and calls it 
-%the task's virtual runtime. Whenever the system timer triggers an interrupt, the virtual runtime 
-%of every task is updated.
-
-%Instead, it calculates how long a process should run as a function of the number of currently 
-%runnable processes, i.e the length of the running queue. The sum of all nice values for all processes
-%in the running queue is used to compute the 
-
-%The kernel uses the nice value as a weight to determine the amount of processor time a process 
-%can consume. Whenever a task joins the running queue, the kernel checks if the currently running 
-%process has consumed a larger proportion of the processor than the new process. If that is the case,
-%it preempts the current process in favour of the new process. The scheduler is said to be 
-%completely fair as it always attempts to give all processes a fair proportion of the processor.
-
+The \verb|sched_entity| object of every process is a part of a 
+a red-black tree whose search key is set to the virtual runtime property. The scheduler picks a new process 
+for execution by traversing the tree and finding the task with the lowest virtual runtime, which is always 
+stored at the leftmost leaf node. The cost of traversal equals the depth of the tree, i.e it takes $\Theta{(\log{n})}$.
+However, the scheduler caches the leftmost node, thereby reducing the cost of traversal down to $\Theta{(1)}$.
+Whenever a process transitions from the \verb|TASK_NEW| state into the \verb|TASK_RUNNING| state, 
+it is assigned the minimal allowed virtual runtime. Therefore, it is automatically 
+placed at the leftmost node and gets to execute immediately. As the system progresses, the process will
+shift more and more to the right branches of the tree and the rest of the tasks will get to execute.
 
 \subsection{Creation}
 \label{ch:fundamentals/processes/creation}

@@ -323,9 +323,9 @@ references to its child processes and parent process, its pending signals and so
 The process scheduler maintains a  queue of all processes that are currently 
 being executed by a processing unit or are waiting to be assigned to one. 
 This queue is represented in memory as a circular doubly linked-list of \verb|task_struct| 
-objects and is called the running queue because all of its tasks are in the \verb|TASK_RUNNING| state.
-The kernel keeps a global pointer \verb|current| to the current task being executed by a processing unit. 
-It is the scheduler's job to determine the most optimal sequence of processes to schedule from the running queue 
+objects and is called the run queue because all of its tasks are in the \verb|TASK_RUNNING| state.
+The kernel keeps a run queue local pointer \verb|current| to the current task being executed by a processing unit. 
+It is the scheduler's job to determine the most optimal sequence of processes to schedule from the run queue 
 onto the processing unit in order to satisfy two conflicting requirements - low latency and high throughput. 
 Low latency is crutial for processes that mostly perform input-output operations. 
 Fetching data from a device, such as a network card, typically takes multiple CPU cycles. 
@@ -346,7 +346,9 @@ This operation is known as preemption.
         \hline
         \verb|TASK_NEW| & The process has been created but it cannot be scheduled for execution and it cannot react to events \\
         \hline
-        \verb|TASK_DEAD| & The process is being cleaned up and deleted \\
+        \verb|EXIT_DEAD| & The process is being cleaned up and deleted \\
+        \hline
+        \verb|EXIT_ZOMBIE| & The process has exited, the parent has been notified via a \verb|SIGCHLD| signal but the parent has not reaped it yet \\
         \hline
     \end{tabular}
     \caption{Table of most important process states in Linux derived from \cite{include/linux/sched.h} and \cite{kernel/sched/core.c}}
@@ -373,17 +375,26 @@ allocated to the task. The invariant that the scheduler tries to enforce is that
 smallest virtual runtime should be the one that is currently using the processing unit. By definition,
 the process with the smallest virtual runtime is also the process that has used the processing unit
 the least. For this reason, the scheduler is said to be completely fair. 
-Whenever the runtime queue is updated, either by an interrupt triggered by the system timer or a 
+Whenever the run queue is updated, either by an interrupt triggered by the system timer or a 
 change in a task's state, the virtual runtime of the task is incremented by a weighted delta
 \begin{equation}
-    d = e * w / \sum_{i = 0}^{n} w_{i}
+    d = e \times w / \sum_{i = 0}^{n} w_{i}
 \end{equation}
 where $e$ refers to the amount of time the task used the central processing unit 
-since the last time the running queue was updated. 
-$w$ corresponds to the priority value of the task. $n$ denotes the length of the running queue. 
+since the last time the run queue was updated. 
+$w$ corresponds to the priority value of the task. $n$ denotes the length of the run queue. 
 The sum in the expression aggregates the priority values of all tasks in the queue. 
 Hence, dividing $w$ by the sum gives us a proxy of the task's priority relative to all 
-other tasks in the queue. 
+other tasks in the queue. In other words, $d$ equals the amount of time the task used 
+the processing unit multiplied by its relative priority of task in the entire run queue.
+
+The \verb|sched_entity| object of every process is also part of a 
+a red-black tree whose search key is set to the virtual runtime property. Whenever the scheduler 
+needs to schedule a new process for execution, it traverses the tree and finds the task with the 
+lowest virtual runtime, which is always stored at the leftmost leaf node of the tree. 
+The complexity of this operation equals the depth of the tree, i.e it takes $\Theta{(n\log{n})}$.
+The scheduler uses a caching mechanism to store the leftmost node whenever a task is enqueued to the run queue, 
+thereby reducing the traversal's cost to $\Theta{(1)}$.
 
 %The Linux kernel has a priority value that measures a 
 %process's willingness to be preempted. In other words, it represents how \enquote{nice} a process 

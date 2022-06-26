@@ -410,15 +410,54 @@ shift more and more to the right branches of the tree and the rest of the tasks 
 
 \subsection{Creation}
 \label{ch:fundamentals/processes/creation}
-The \verb|clone()| and \verb|fork()| system calls are the only mechanisms for creating a 
-new process from user space. The former is a non-portable but very flexible method for creating a
+The \verb|libc| wrapper functions \verb|clone()| and \verb|fork()| are the only mechanisms for 
+creating a new process from user space. The former is a non-portable but very flexible method for creating a
 duplicate of the calling process. It gives the caller fine-grained control over the resources that 
-the parent and the child get to share. 
-The \verb|clone()| system call is used by threading libraries to implement threads. 
-This is possible because the kernel does not differentiate between processes and threads. 
-In essence, the only difference between both is that threads share the same address space, i.e 
-their memory descriptor points to the same virtual memory pages. Additionally, the kernel 
-uses this system call to implement \verb|fork()|. 
+the parent and the child get to share. Both functions internally use the \verb|SYS_clone| system call 
+to create the child. However, \verb|clone()| gives the caller the ability to configure the child's execution 
+context, whereas \verb|fork()| does not. Instead, \verb|fork()| transparently preconfigures the child.
+It is important to note that the the configuration options passed into \verb|SYS_clone| define 
+the noninterference boundary between a child and its parent. As a matter of fact, the 
+noninterference boundary is what allows us to differentiate between a process and a thread. 
+A child whose memory descriptor refers to the same virtual memory pages as its parent is a thread. 
+A child with separate virtual memory pages is a process. Most container runtimes utilise 
+the standard noninterference bonudary guaranteed by \verb|fork()| and further enhance it 
+with additional system calls instead of directly using \verb|clone()| for reasons explained 
+in the next paragraph. 
+
+%%ost container runtimes utilise the noninterference
+%boundary provided by \verb|fork()| because the function is part of the  
+%POSIX standard and keeps process creation protable amongst compliant platforms. 
+\begin{lstlisting}[style=syscalls, caption={Clone System Call}]
+#define _GNU_SOURCE
+#include <sched.h>
+
+int clone(int (*fn)(void *), void *stack, int flags, void *arg, ...
+          /* pid_t *parent_tid, void *tls, pid_t *child_tid */ );
+
+/* Returns thread id of child on success, -1 on error with errno set */
+
+\end{lstlisting}
+\verb|clone()| creates a child process that begins its lifecycle by executing 
+the function pointer \verb|fn|. The return value of \verb|fn| represents the exit code with which 
+the child process will terminate. The function pointer expects a generic argument 
+as input that can be concretised by the caller via the \verb|arg| parameter.
+The \verb|flags| argument represents a bit mask used by the caller to configure 
+the child's execution context. For example, setting the \verb|CLONE_VM| flag will result in 
+both processes sharing the same virtual address space. Memory writes performed by one process will 
+be visible to the other process. Similarly, the \verb|CLONE_FILES| flag can be set so that 
+the child and parent processes share the same file descriptor table. If one of the processes 
+closes a file descriptor, the other process is also affected. The bit mask can also be used 
+to put the child process in freshly-allocated resource namespaces - an important noninterference construct 
+discussed in Chapter \ref{ch:fundamentals/processes/security}.
+
+The system call wrapper expects the caller to provide a memory region to be used as the new process's stack. 
+The wrapper pushes the function pointer onto the stack, validates the input parameters to the system 
+call and transfers execution to the kernel by calling the system call. 
+The kernel places the new process in the run queue and gives control back to the wrapper, which
+checks if the process identifier returned by the kernel equals $0$. If it does, then the currently 
+executing process is the child. The wrapper immediately pops the funtion off from the stack 
+and calls it inside the new execution context \cite{aarch64/clone.S}. 
 
 \subsection{Termination}
 \label{ch:fundamentals/processes/termination}

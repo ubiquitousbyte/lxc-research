@@ -270,6 +270,13 @@ creating, terminating, monitoring and protecting processes from each other
 \ref{ch:fundamentals/processes/monitoring}, \ref{ch:fundamentals/processes/resource-management}, 
 \ref{ch:fundamentals/processes/security}).
 
+Every process on Linux is represented as a \verb|task_struct| \cite{include/linux/sched.h} 
+which contains various bits of information such as the process's memory descriptor, the table of 
+open file descriptors, the running state of the process (see Table \ref{table:proc-states}), 
+its pending signals and so on.
+Processes are organised in a hierarchy, where each process can have an arbitrary number of children
+and a single parent. The kernel expresses this relationship by having each task store a pointer 
+to its parent and a circular doubly linked list to all of its children. 
 
 \subsection{Memory Layout}
 \label{ch:fundamentals/processes/memory-layout}
@@ -310,16 +317,13 @@ library is reentrant and can be brought into physical memory only once. The memo
 process that depends on \verb|libc| does not have to load its own copy of the library into memory. 
 Instead, its page table entries can map to the same physical frames that all other processes refer to 
 when using the library. This reduces memory consumption and therefore has positive implications 
-on same-host density. 
+on same-host density.
 
 \subsection{Scheduling}
 \label{ch:fundamentals/processes/execution-scheduling}
 Systems running more than one process rely on a process scheduler to determine, in real-time, 
 which process should use the processing unit such that all processes do meaningful work 
-and the core does not idle. Every process on Linux is represented as a \verb|task_struct| \cite{include/linux/sched.h} 
-which contains various bits of information such as the process's memory descriptor, the table of 
-open file descriptors, the running state of the process (see Table \ref{table:proc-states}), 
-references to its child processes and parent process, its pending signals and so on. 
+and the core does not idle. 
 The process scheduler maintains a  queue of all processes that are currently 
 being executed by a processing unit or are waiting to be assigned to one. 
 This queue is represented in memory as a circular doubly linked-list of \verb|task_struct| 
@@ -406,6 +410,16 @@ shift more and more to the right branches of the tree and the rest of the tasks 
 
 \subsection{Creation}
 \label{ch:fundamentals/processes/creation}
+The \verb|clone()| and \verb|fork()| system calls are the only mechanisms for creating a 
+new process from user space. The former is a non-portable but very flexible method for creating a
+duplicate of the calling process. It gives the caller fine-grained control over the resources that 
+the parent and the child get to share. 
+The \verb|clone()| system call is used by threading libraries to implement threads. 
+This is possible because the kernel does not differentiate between processes and threads. 
+In essence, the only difference between both is that threads share the same address space, i.e 
+their memory descriptor points to the same virtual memory pages. Additionally, the kernel 
+uses this system call to implement \verb|fork()|. 
+
 \subsection{Termination}
 \label{ch:fundamentals/processes/termination}
 \subsection{Monitoring}

@@ -428,7 +428,7 @@ in the next paragraph.
 %%ost container runtimes utilise the noninterference
 %boundary provided by \verb|fork()| because the function is part of the  
 %POSIX standard and keeps process creation protable amongst compliant platforms. 
-\begin{lstlisting}[style=syscalls, caption={Clone System Call}]
+\begin{lstlisting}[style=syscalls, caption={Clone System Call Wrapper}]
 #define _GNU_SOURCE
 #include <sched.h>
 
@@ -451,13 +451,17 @@ closes a file descriptor, the other process is also affected. The bit mask can a
 to put the child process in freshly-allocated resource namespaces - an important noninterference construct 
 discussed in Chapter \ref{ch:fundamentals/processes/security}.
 
-The system call wrapper expects the caller to provide a memory region to be used as the new process's stack. 
-The wrapper pushes the function pointer onto the stack, validates the input parameters to the system 
-call and transfers execution to the kernel by calling the system call. 
-The kernel places the new process in the run queue and gives control back to the wrapper, which
-checks if the process identifier returned by the kernel equals $0$. If it does, then the currently 
-executing process is the child. The wrapper immediately pops the funtion off from the stack 
-and calls it inside the new execution context \cite{aarch64/clone.S}. 
+The caller is expected to provide a memory region to be used as the new process's stack. 
+The system call wrapper pushes the function pointer onto the stack and transfers execution 
+to the kernel. The kernel creates the new process by copying the old process - taking into consideration 
+which parts should be copied based on the \verb|flags| bit mask. Importantly, the kernel places 
+the start address of the user-defined stack into the stack register of the processing unit.
+Afterwards, the process is placed in the run queue and control is returned to the system call wrapper.
+The system call itself returns two times - once in the parent process where the return value corresponds 
+to the process identifier in the child, and once in the child process where the return value is zero. 
+The system call wrapper handles the latter case by popping the function pointer of the stack 
+and calling it \cite{aarch64/clone.S}, thereby using the function pointer as the main entry point 
+into the child process.
 
 \subsection{Termination}
 \label{ch:fundamentals/processes/termination}

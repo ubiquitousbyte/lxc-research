@@ -13,7 +13,7 @@
 /* The entry point into the child  */
 int child_process(void *data)
 {
-    printf("Child: %d\n", getpid());
+    printf("Child: %d\nChild parent: %d\n", getpid(), getppid());
     return 0;
 }
 

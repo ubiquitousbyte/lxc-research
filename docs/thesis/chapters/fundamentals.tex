@@ -423,7 +423,7 @@ A child whose memory descriptor refers to the same virtual memory pages as its p
 A child with separate virtual memory pages is a process. Most container runtimes utilise 
 the standard noninterference bonudary guaranteed by \verb|fork()| and further enhance it 
 with additional system calls instead of directly using \verb|clone()| for reasons explained 
-in the next paragraph. 
+in the next paragraphs. 
 
 %%ost container runtimes utilise the noninterference
 %boundary provided by \verb|fork()| because the function is part of the  
@@ -449,19 +449,31 @@ be visible to the other process. Similarly, the \verb|CLONE_FILES| flag can be s
 the child and parent processes share the same file descriptor table. If one of the processes 
 closes a file descriptor, the other process is also affected. The bit mask can also be used 
 to put the child process in freshly-allocated resource namespaces - an important noninterference construct 
-discussed in Chapter \ref{ch:fundamentals/processes/security}.
+discussed in Chapter \ref{ch:fundamentals/processes/security}. The lower byte of the bit mask 
+is used to specify the child's termination signal. If left unset, the parent has no way 
+of terminating the child.
 
 The caller is expected to provide a memory region to be used as the new process's stack. 
 The system call wrapper pushes the function pointer onto the stack and transfers execution 
 to the kernel. The kernel creates the new process by copying the old process - taking into consideration 
 which parts should be copied based on the \verb|flags| bit mask. Importantly, the kernel places 
-the start address of the user-defined stack into the stack register of the processing unit.
+the start address of the user-defined stack into the stack register of the processing unit and configures 
+the memory descriptor of the child to point to the same address.
 Afterwards, the process is placed in the run queue and control is returned to the system call wrapper.
 The system call itself returns two times - once in the parent process where the return value corresponds 
 to the process identifier in the child, and once in the child process where the return value is zero. 
 The system call wrapper handles the latter case by popping the function pointer of the stack 
 and calling it \cite{aarch64/clone.S}, thereby using the function pointer as the main entry point 
 into the child process.
+
+The caller can also set the value of the thread-local storage register for the child process via the 
+\verb|tls| parameter. However, the interpretation of this value is architecture-specific.
+The primary limitation of the \verb|clone()| wrapper is the inability to call \verb|libc| functions 
+from inside the child process. \verb|libc| expects the thread-local storage register to be configured 
+in a specific way that cannot be reproduced. Consequently, the child may crash at arbitrary points 
+during its execution.
+
+
 
 \subsection{Termination}
 \label{ch:fundamentals/processes/termination}

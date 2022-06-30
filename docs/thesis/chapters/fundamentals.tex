@@ -420,14 +420,9 @@ It is important to note that the the configuration options passed into \verb|SYS
 the noninterference boundary between a child and its parent. As a matter of fact, the 
 noninterference boundary is what allows us to differentiate between a process and a thread. 
 A child whose memory descriptor refers to the same virtual memory pages as its parent is a thread. 
-A child with separate virtual memory pages is a process. Most container runtimes utilise 
-the standard noninterference bonudary guaranteed by \verb|fork()| and further enhance it 
-with additional system calls instead of directly using \verb|clone()| for reasons explained 
-in the next paragraphs. 
+A child with separate virtual memory pages is a process. 
+\clearpage
 
-%%ost container runtimes utilise the noninterference
-%boundary provided by \verb|fork()| because the function is part of the  
-%POSIX standard and keeps process creation protable amongst compliant platforms. 
 \begin{lstlisting}[style=syscalls, caption={Clone System Call Wrapper}]
 #define _GNU_SOURCE
 #include <sched.h>
@@ -466,13 +461,42 @@ The system call wrapper handles the latter case by popping the function pointer 
 and calling it \cite{aarch64/clone.S}, thereby using the function pointer as the main entry point 
 into the child process.
 
-The caller can also set the value of the thread-local storage register for the child process via the 
-\verb|tls| parameter. However, the interpretation of this value is architecture-specific.
-The primary limitation of the \verb|clone()| wrapper is the inability to call \verb|libc| functions 
-from inside the child process. \verb|libc| expects the thread-local storage register to be configured 
-in a specific way that cannot be reproduced. Consequently, the child may crash at arbitrary points 
-during its execution.
+There are multiple caveats that need to be considered when calling \verb|clone()|. 
+First, the \verb|stack| parameter must point to the top address of the stack. Because the stack 
+grows downwards, the address to be passed to \verb|clone()| is not the start address of the memory region but the 
+end address, which needs to be aligned according to the application binary interface. Second, 
+careful attention must be paid when creating a child with the \verb|CLONE_VM| flag set. 
+The child process cannot depend on anything defined in \verb|libc| because it risks polluting 
+the parent's runtime environment. In particular, important variables allocated in thread-local storage 
+by the linker are not set up for the child, e.g the \verb|errno| variable, the standard input-output streams
+and more. Instead, they are shared between parent and child. 
 
+\subsubsection{Example 1}
+
+\lstinputlisting[label={code:os-concepts/src/clone.c}, style=c-code-snippets, caption={os-concepts/src/clone.c}, firstline=13, lastline=47]
+{/home/nas/lxc-research/src/os-concepts/src/clone.c}
+
+Code snippet \ref{code:os-concepts/src/clone.c} shows how to create a child process via 
+the \verb|clone()| wrapper. First, the parent prints its process identifier to standard output. 
+Afterwards, it sets up a memory region to be used as the child's stack by allocating 
+two pages of memory that can be read from and written to by both processes.
+The memory region is not backed by external storage and changes made by one process are not visible to the other.
+Furthermore, the starting memory address is page-aligned and chosen by the kernel.
+On line 22, the system call wrapper is executed with the \verb|child_process| function set as the entry point into the child. 
+The \verb|shared_resources| variable refers to the 
+bit mask that controls what the parent and child get to share. It is set to zero, indicating that 
+they will not share any resources. The bit mask is ORed with \verb|SIGCHLD| - the signal 
+that will be sent to the parent when the child finishes execution. On lines 27-31, the 
+parent blocks until it receives the \verb|SIGCHLD| signal and exits.
+In code snippet \ref{code:os-concepts/src/clone.c-exec} the program is executed. The output shows the 
+hierarchical relationship between the child and the parent obtained by calls to \verb|getpid()| and 
+\verb|getppid()|. 
+\begin{lstlisting}[label={code:os-concepts/src/clone.c-exec}, style=bash, caption={os-concepts/src/clone.c output}]
+$ ./clone 
+Parent: 329638
+Child: 329657
+Child parent: 329638
+\end{lstlisting}
 
 
 \subsection{Termination}

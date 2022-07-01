@@ -497,6 +497,44 @@ Parent: 329638
 Child: 329657
 Child parent: 329638
 \end{lstlisting}
+\begin{lstlisting}[label={code:os-concepts/src/clone.c-clone-vm}, style=c-code-snippets, caption={Clone with virtual memory sharing}]
+int child_process(void *data)
+{
+    /* Set "thread-local" variable to a value */
+    errno = EINPROGRESS;
+    return 0;
+}
+int main(int argc, char *argv[])
+{
+    /* Prepare stack .. */
+    int shared_resources = CLONE_VM;
+    pid_t child = clone(child_process, stack + stack_len,
+                        shared_resources | SIGCHLD, NULL);
+    /* Wait for child to terminate .. */
+    assert(errno == EINPROGRESS);
+    return 0;
+}
+\end{lstlisting}
+If we were to modify the example in (\ref{code:os-concepts/src/clone.c}) so that the parent and child share the same virtual memory pages,
+then thread-local variables would be shared between both execution contexts without being properly 
+placed in thread-local storage,  potentially 
+resulting in undefined behavior when interacting with \verb|libc|, as shown by (\ref{code:os-concepts/src/clone.c-clone-vm}).
+\begin{lstlisting}[style=syscalls, caption={Fork System Call Wrapper}]
+#include <unistd.h>
+
+pid_t fork(void);
+
+/* Returns process identifier of child in parent, or -1 on error; Returns 0 in child */
+\end{lstlisting}
+The \verb|fork()| system call creates a child process transparently preconfigured to share 
+no resources with the child and to respond to the \verb|SIGCHLD| signal upon termination.
+In other words, it is equivalent to calling \verb|clone()| with the \verb|flags| bit mask set to 
+zero. \verb|fork()| returns two times - once in the parent and once in the child. In the latter 
+case, the returned value is zero. Hence, the caller can define the child's logic via a conditional 
+statement, as shown in (\ref{code:os-concepts/src/fork.c}).
+\subsubsection{Example 2}
+\lstinputlisting[label={code:os-concepts/src/fork.c}, style=c-code-snippets, caption={os-concepts/src/fork.c}, firstline=11, lastline=31]
+{/home/nas/lxc-research/src/os-concepts/src/fork.c}
 
 
 \subsection{Termination}

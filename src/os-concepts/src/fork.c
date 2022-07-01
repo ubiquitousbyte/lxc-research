@@ -6,18 +6,26 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <sys/wait.h>
 
 int main(int argc, char *argv[])
 {
+    printf("Parent: %d\n", getpid());
+
     pid_t child = fork();
-    switch (child) {
-    case 0:
+    if (child < 0)
+        goto err;
+
+    if (child == 0) {
         printf("Child: %d\nChild parent: %d\n", getpid(), getppid());
-        break;
-    case -1:
-        printf("%s", strerror(errno));
-        return 1;
-    default:
-        printf("Parent: %d\n", getpid());
+    } else {
+        int status;
+        if (waitpid(child, &status, 0) != child)
+            goto err;
     }
+
+    return 0;
+err:
+    printf("%s", strerror(errno));
+    return 1;
 }

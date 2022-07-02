@@ -423,7 +423,7 @@ A child whose memory descriptor refers to the same virtual memory pages as its p
 A child with separate virtual memory pages is a process. 
 \clearpage
 
-\begin{lstlisting}[style=syscalls, caption={Clone System Call Wrapper}]
+\begin{lstlisting}[style=syscalls, caption={Clone and Fork System Call Wrappers}]
 #define _GNU_SOURCE
 #include <sched.h>
 
@@ -432,7 +432,18 @@ int clone(int (*fn)(void *), void *stack, int flags, void *arg, ...
 
 /* Returns thread id of child on success, -1 on error with errno set */
 
+#include <unistd.h>
+
+pid_t fork(void);
+
+/* Returns process identifier of child in parent, or -1 on error; Returns 0 in child */
+
 \end{lstlisting}
+Whenever a new child process is created, both the parent and the child share the same text segment.
+The child obtains a dedicated copy of the parent's stack, heap and data segments if and onl if 
+it attempts to write to one of those segments. Otherwise, the kernel will not explicitly copy 
+anything, due to the expensivness of the operation. This technique is known as copy on write.
+
 \verb|clone()| creates a child process that begins its lifecycle by executing 
 the function pointer \verb|fn|. The return value of \verb|fn| represents the exit code with which 
 the child process will terminate. The function pointer expects a generic argument 
@@ -446,14 +457,13 @@ closes a file descriptor, the other process is also affected. The bit mask can a
 to put the child process in freshly-allocated resource namespaces - an important noninterference construct 
 discussed in Chapter \ref{ch:fundamentals/processes/security}. The lower byte of the bit mask 
 is used to specify the child's termination signal. If left unset, the parent has no way 
-of terminating the child.
+of reaping the child.
 
 The caller is expected to provide a memory region to be used as the new process's stack. 
 The system call wrapper pushes the function pointer onto the stack and transfers execution 
 to the kernel. The kernel creates the new process by copying the old process - taking into consideration 
 which parts should be copied based on the \verb|flags| bit mask. Importantly, the kernel places 
-the start address of the user-defined stack into the stack register of the processing unit and configures 
-the memory descriptor of the child to point to the same address.
+the start address of the user-defined stack into the stack register of the processing unit.
 Afterwards, the process is placed in the run queue and control is returned to the system call wrapper.
 The system call itself returns two times - once in the parent process where the return value corresponds 
 to the process identifier in the child, and once in the child process where the return value is zero. 
@@ -473,9 +483,6 @@ and more. Instead, they are shared between parent and child.
 
 \subsubsection{Example 1}
 
-\lstinputlisting[label={code:os-concepts/src/clone.c}, style=c-code-snippets, caption={os-concepts/src/clone.c}, firstline=13, lastline=47]
-{/home/nas/lxc-research/src/os-concepts/src/clone.c}
-
 Code snippet \ref{code:os-concepts/src/clone.c} shows how to create a child process via 
 the \verb|clone()| wrapper. First, the parent prints its process identifier to standard output. 
 Afterwards, it sets up a memory region to be used as the child's stack by allocating 
@@ -487,60 +494,211 @@ The \verb|shared_resources| variable refers to the
 bit mask that controls what the parent and child get to share. It is set to zero, indicating that 
 they will not share any resources. The bit mask is ORed with \verb|SIGCHLD| - the signal 
 that will be sent to the parent when the child finishes execution. On lines 27-31, the 
-parent blocks until it receives the \verb|SIGCHLD| signal and exits.
-In code snippet \ref{code:os-concepts/src/clone.c-exec} the program is executed. The output shows the 
-hierarchical relationship between the child and the parent obtained by calls to \verb|getpid()| and 
-\verb|getppid()|. 
-\begin{lstlisting}[label={code:os-concepts/src/clone.c-exec}, style=bash, caption={os-concepts/src/clone.c output}]
-$ ./clone 
-Parent: 329638
-Child: 329657
-Child parent: 329638
-\end{lstlisting}
-\begin{lstlisting}[label={code:os-concepts/src/clone.c-clone-vm}, style=c-code-snippets, caption={Clone with virtual memory sharing}]
-int child_process(void *data)
-{
-    /* Set "thread-local" variable to a value */
-    errno = EINPROGRESS;
-    return 0;
-}
-int main(int argc, char *argv[])
-{
-    /* Prepare stack .. */
-    int shared_resources = CLONE_VM;
-    pid_t child = clone(child_process, stack + stack_len,
-                        shared_resources | SIGCHLD, NULL);
-    /* Wait for child to terminate .. */
-    assert(errno == EINPROGRESS);
-    return 0;
-}
-\end{lstlisting}
+parent blocks until it receives the \verb|SIGCHLD| signal  from the child and exits.
+In (\ref{code:os-concepts/src/clone.c-exec}) the output of the program shows the 
+relationship between the child and the parent obtained by calls to \verb|getpid()| and \verb|getppid()|. 
+
 If we were to modify the example in (\ref{code:os-concepts/src/clone.c}) so that the parent and child share the same virtual memory pages,
-then thread-local variables would be shared between both execution contexts without being properly 
-placed in thread-local storage,  potentially 
-resulting in undefined behavior when interacting with \verb|libc|, as shown by (\ref{code:os-concepts/src/clone.c-clone-vm}).
-\begin{lstlisting}[style=syscalls, caption={Fork System Call Wrapper}]
-#include <unistd.h>
+then thread-local variables would not be properly 
+placed in thread-local storage, potentially 
+resulting in undefined behavior when interacting with \verb|libc|.
 
-pid_t fork(void);
-
-/* Returns process identifier of child in parent, or -1 on error; Returns 0 in child */
-\end{lstlisting}
 The \verb|fork()| system call creates a child process transparently preconfigured to share 
-no resources with the child and to respond to the \verb|SIGCHLD| signal upon termination.
+no resources with the parent and to respond to the \verb|SIGCHLD| signal upon termination.
 In other words, it is equivalent to calling \verb|clone()| with the \verb|flags| bit mask set to 
-zero. \verb|fork()| returns two times - once in the parent and once in the child. In the latter 
+zero and ORing it with \verb|SIGCHLD|. \verb|fork()| returns two times - once in the parent and once in the child. In the latter 
 case, the returned value is zero. Hence, the caller can define the child's logic via a conditional 
-statement, as shown in (\ref{code:os-concepts/src/fork.c}).
-\subsubsection{Example 2}
-\lstinputlisting[label={code:os-concepts/src/fork.c}, style=c-code-snippets, caption={os-concepts/src/fork.c}, firstline=11, lastline=31]
-{/home/nas/lxc-research/src/os-concepts/src/fork.c}
+statement.
 
+\lstinputlisting[label={code:os-concepts/src/clone.c}, style=c-code-snippets, caption={os-concepts/src/clone.c}, firstline=13, lastline=47]
+{/home/nas/lxc-research/src/os-concepts/src/clone.c}
+\begin{lstlisting}[label={code:os-concepts/src/clone.c-exec}, style=bash, caption={os-concepts/src/clone.c output}]
+    $ ./clone 
+    Parent: 329638
+    Child: 329657
+    Child parent: 329638
+\end{lstlisting}
 
 \subsection{Termination}
 \label{ch:fundamentals/processes/termination}
+\begin{lstlisting}[style=syscalls, caption={Exit System Call and Wrappers}]
+#include <stdlib.h>
+
+noreturn void exit(int status);
+
+int atexit(void (*function)(void));
+
+/* Returns 0 if successful; otherwise a nonzero value */
+
+#include <unistd.h>
+
+noreturn void _exit(int status);
+\end{lstlisting}
+
+Processes can terminate abnormally or normally. Abnormal termination happens when a process 
+receives a signal from the kernel or another process. For example, division by zero causes 
+the hardware to detect a fault condition and notify the kernel. The kernel can then send a termination 
+signal to the process that made the arithmetic error. Sending a signal to a process directly 
+interrupts its execution flow by saving the current state of the registers and causing the processing 
+unit to jump to a signal handler - a function dedicated to processing a particular signal. 
+After the signal handler is executed, the process either terminates or continues its execution from 
+the point of interruption. 
+
+A process terminates normally when it invokes the \verb|_exit()| system call. In doing so, it notifies the 
+kernel that it can reclaim all of the process's resources, including its memory descriptor, 
+file table, scheduling information and more. Additionally, the kernel notifies the parent 
+about the child's termination by sending it the termination signal defined when the child was created - 
+typically the \verb|SIGCHLD| signal. The child can send its termination status to the parent
+by passing a signed integer to the \verb|_exit()| functon. Conventionally, an exit status of 0 
+means that the child has successfully executed its operations.
+
+Alternatively, a process can call the \verb|exit()| wrapper defined in \verb|libc|, which internally 
+uses \verb|_exit()|.
+In addition to releasing operating-system resources, the \verb|exit()| function also invokes 
+a set of exit handlers defined by the application programmer and \verb|libc| to cleanup auxillary
+resources. For example, \verb|libc| defines an exit handler that flushes the standard input-output 
+buffers of the process. Users can register exit handlers via the \verb|atexit| function. 
+Exit handlers are called in reverse order of registration. If an exit handler fails to return, then 
+the remaining set is not called. 
+
+\subsubsection{Example 2}
+\begin{lstlisting}[label={code:os-concepts/src/exit-normal.c}, style=c-code-snippets, caption={os-concepts/src/exit-normal.c}]
+void exit_handler_1(void)
+{
+    printf("Process %d invoked exit handler 1\n", getpid());
+}
+void exit_handler_2(void)
+{
+    printf("Process %d invoked exit handler 2\n", getpid());
+}
+int main(int argc, char *argv[])
+{
+    printf("Parent process: %d\n", getpid());
+    /* Register exit handlers in parent */
+    atexit(exit_handler_1);
+    atexit(exit_handler_2);
+    pid_t child = fork();
+    if (child < 0)
+        goto err;
+    if (child == 0) {
+        /* Child process begins execution here */
+        printf("Child process: %d\n", getpid());
+        exit(0);
+    }
+    int status;
+    if (waitpid(child, &status, 0) != child)
+        goto err;
+    printf("Child exited with status %d\n", status);
+    return 0;
+err:
+    printf("%s", strerror(errno));
+    return 1;
+}
+\end{lstlisting}
+\begin{lstlisting}[label={code:os-concepts/src/exit-normal.c-exec}, style=bash, caption={os-concepts/src/exit-normal.c output}]
+    $ ./exit 
+    Parent process: 14862
+    Child process: 14863
+    Process 14863 invoked exit handler 2
+    Process 14863 invoked exit handler 1
+    Child exited with status 0
+    Process 14862 invoked exit handler 2
+    Process 14862 invoked exit handler 1
+\end{lstlisting}
+Code snippet \ref{code:os-concepts/src/exit-normal.c} shows an example of normal process termination. 
+The parent registers two exit handlers that print the identifier of 
+the process that invoked them. On line 19, the parent creates a child via the \verb|fork()| system call.
+The child prints its process identifier and invokes \verb|exit()| with a status of zero. This causes 
+the kernel to send a notification signal to the parent who is waiting at line 30 until it receives 
+the signal. The parent prints the status of the child and exits. In (\ref{code:os-concepts/src/exit-normal.c-exec}) the program 
+is executed. Notice that the exit handlers are invoked four times - two times in the parent and two times 
+in the child. That is because a child inherits a copy of its parent's exit registrations. 
+Since the child exits first, it always invokes the exit handlers before the parent.
+If the child had terminated via \verb|_exit()|, then the exit handlers would have been executed 
+solely by the parent.
+
+\subsubsection{Example 3}
+Code snippet \ref{code:os-concepts/src/exit-abnormal.c} shows an example of abnormal process termination 
+caused by an interactive interrupt signal. The parent creates a child that registers a signal handler 
+to be executed whenever it receives a \verb|SIGINT| signal. The signal handler is registered via the 
+\verb|sigaction| system call, which overrides the default handler for \verb|SIGINT| with the one 
+specified in the \verb|.sa_handler| field. 
+The signal handler prints a message to
+standard output and terminates the process.
+After registering the handler, the child suspends itself, i.e it manually enters the \verb|TASK_INTERRUPTIBLE| state by 
+calling \verb|pause()|. 
+On line 27, the parent waits for the child to exit. 
+If the child does not receive a \verb|SIGINT| signal, the parent will wait indefinitely.
+The program is executed in (\ref{code:os-concepts/src/exit-abnormal.c-exec}) by starting the parent as a background task and 
+manually sending the \verb|SIGINT| to the child process through the \verb|kill| command.  
+The signal handler that terminates the child is triggered and the kernel notifies the parent of the event.
+The parent reports the child's termination status and exits. 
+
+It is important to note that calling \verb|printf| from a signal handler may be unsafe in certain circumstances.
+Consider a thread of execution being interrupted by a signal handler while it is executing \verb|printf|.
+If the signal handler also calls \verb|printf|, it will corrupt the internal data structures used to 
+keep track of the amount of data and the current position in the buffer. This will lead to 
+unexpected results when control is returned back from the signal handler to the thread that was interrupted.
+For this reason, the \verb|printf| function is said to be async-signal unsafe, i.e it is not atomic 
+with respect to signal interrupts.  In the current example, the child does not call \verb|printf|
+after the new signal handler is registered, so its usage is safe. 
+In practice, however, processes 
+are large and complex enough for this to become a problem. 
+
+Also, signal handlers cannot be used to reliably track the number of signals generated, because 
+signals are not queued. While a signal handler is executing and the same signal is sent 
+multiple times to the process, that signal is marked as pending and is later redelivered only once.
+
+\begin{lstlisting}[label={code:os-concepts/src/exit-abnormal.c}, style=c-code-snippets, caption={os-concepts/src/exit-abnormal.c}]
+/* Will get triggered when the caller pushes Ctrl+C */
+void default_interaction_handler(int signal)
+{
+    printf("Terminating process\n");
+    _exit(0);
+}
+int main(int argc, char *argv[])
+{
+    pid_t child = fork();
+    if (child < 0)
+        goto err;
+    if (child == 0) {
+        printf("Child identifier: %d\n", getpid());
+        /* Child registers sigint handler */
+        struct sigaction action = {.sa_handler = default_interaction_handler };
+        if (sigaction(SIGINT, &action, NULL) != 0)
+            goto err;
+
+        /* Child is suspended until it receives a signal */
+        pause();
+    }
+    /* Caller will block indefinitely until child exits */
+    int status;
+    if (waitpid(child, &status, 0) != child)
+        goto err;
+    printf("Child exited with status %d\n", status);
+    return 0;
+err:
+    printf("%s", strerror(errno));
+    return 1;
+}
+\end{lstlisting}
+\begin{lstlisting}[label={code:os-concepts/src/exit-abnormal.c-exec}, style=bash, caption={os-concepts/src/exit-abnormal.c output}]
+    $ ./exit-abnormal &
+    [1] 162043
+    Child identifier: 162044
+    $ kill -s SIGINT 162044
+    Terminating process
+    Child exited with status 0
+    [1]+  Done                    ./exit-abnormal
+\end{lstlisting}
 \subsection{Monitoring}
 \label{ch:fundamentals/processes/monitoring}
+
+
+%The parent is required to reap 
+%the child. Otherwise, the identifier of the child will not be removed from the system-wide 
+%table of process identifiers.
+
 \subsection{Communication}
 \label{ch:fundamentals/processes/communication}
 \subsection{Resource Management}

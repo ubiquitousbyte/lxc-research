@@ -4,7 +4,6 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/wait.h>
-#include <assert.h>
 
 void exit_handler_1(void)
 {

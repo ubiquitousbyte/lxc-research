@@ -638,7 +638,7 @@ It is important to note that calling \verb|printf| from a signal handler may be 
 Consider a thread of execution being interrupted by a signal handler while it is executing \verb|printf|.
 If the signal handler also calls \verb|printf|, it will corrupt the internal data structures used to 
 keep track of the amount of data and the current position in the buffer. This will lead to 
-unexpected results when control is returned back from the signal handler to the thread that was interrupted.
+unexpected results when control is returned back from the signal handler to the thread.
 For this reason, the \verb|printf| function is said to be async-signal unsafe, i.e it is not atomic 
 with respect to signal interrupts.  In the current example, the child does not call \verb|printf|
 after the new signal handler is registered, so its usage is safe. 
@@ -683,16 +683,30 @@ err:
 }
 \end{lstlisting}
 \begin{lstlisting}[label={code:os-concepts/src/exit-abnormal.c-exec}, style=bash, caption={os-concepts/src/exit-abnormal.c output}]
-    $ ./exit-abnormal &
-    [1] 162043
-    Child identifier: 162044
-    $ kill -s SIGINT 162044
-    Terminating process
-    Child exited with status 0
-    [1]+  Done                    ./exit-abnormal
+$ ./exit-abnormal &
+[1] 162043
+Child identifier: 162044
+$ kill -s SIGINT 162044
+Terminating process
+Child exited with status 0
+[1]+  Done                    ./exit-abnormal
 \end{lstlisting}
 \subsection{Monitoring}
 \label{ch:fundamentals/processes/monitoring}
+\begin{lstlisting}[style=syscalls, caption={Wait System Call and Wrappers}]
+#include <sys/wait.h>
+
+pid_t wait(int *status);
+
+/* Returns process identifier of terminated child; -1 on error */
+
+pid_t waitpid(pid_t pid, int *status, int options);
+
+/* Returns process identifier of child; 0; -1 on error */
+\end{lstlisting}
+The parent process often wants to gather information about when and how a child has terminated. 
+This functionality is provided by \verb|wait()| and \verb|waitpid()|, as already shown in 
+(\ref{code:os-concepts/src/clone.c}), (\ref{code:os-concepts/src/exit-normal.c-exec}) and (\ref{code:os-concepts/src/exit-abnormal.c-exec}).
 
 
 %The parent is required to reap 

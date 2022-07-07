@@ -19,8 +19,10 @@ add_library(conty STATIC)
 target_sources(conty 
     PRIVATE
         ${CONTY_PRIVATE}/oci.cpp
+        ${CONTY_PRIVATE}/resource-namespace.cpp
     PUBLIC
-        ${CONTY_PUBLIC_HDR}/oci.h)
+        ${CONTY_PUBLIC_HDR}/oci.h
+        ${CONTY_PUBLIC_HDR}/conty.h)
 target_include_directories(conty PUBLIC ${CONTY_PUBLIC})
 target_link_libraries(conty PRIVATE nlohmann_json::nlohmann_json)
 

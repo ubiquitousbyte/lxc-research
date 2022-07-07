@@ -39,10 +39,7 @@ namespace oci {
 
     specification specification::from_json(const std::string& json_string)
     {
-        auto j = json::parse(json_string);
-        specification s{};
-        oci::from_json(j, s);
-        return s;
+        return json::parse(json_string);
     }
 };
     

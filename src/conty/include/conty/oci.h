@@ -1,26 +1,28 @@
+#ifndef CONTY_OCI_H
+#define CONTY_OCI_H
+
 #include <string>
 #include <vector>
 
 namespace oci {
-
     /*
-     * A hook represents a program that is run at a specific point in the 
-     * lifecycle of a container. Hooks are used by container engines to 
-     * configure the execution context of a container. 
+     * A hook represents a program that is run at a specific point in the
+     * lifecycle of a container. Hooks are used by container engines to
+     * configure the execution context of a container.
      */
     struct hook {
         std::string path;
         std::vector<std::string> args;
         std::vector<std::string> env;
-        int timeout;
+        unsigned int timeout;
     };
 
     /*
      * All hooks semantically grouped by a container's lifecycle event
-     * We do not follow the naming used in the specification because 
-     * it is confusing. 
+     * We do not follow the naming used in the specification because
+     * it is confusing.
      */
-    struct container_hooks { 
+    struct container_hooks {
         std::vector<hook> on_create_rt_depr;
         std::vector<hook> on_create_rt;
         std::vector<hook> on_create_cont;
@@ -31,7 +33,7 @@ namespace oci {
 
     /*
      * Open Container Initiative Specification object
-     */ 
+     */
     struct specification {
         std::string version;
         container_hooks hooks;
@@ -42,4 +44,4 @@ namespace oci {
         static specification from_json(const std::string& json_string);
     };
 };
-
+#endif //CONTY_OCI_H

@@ -7,7 +7,7 @@
 namespace oci {
     using json = nlohmann::json;
 
-    /* Small utility to deserialize a container that has a default initializer */
+    /* Small utility to deserialize a value that has a default initializer */
     template<class T>
     void default_value(const json& j, const char *key, T& out)
     {

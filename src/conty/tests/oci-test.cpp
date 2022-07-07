@@ -1,10 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <nlohmann/json.hpp>
-
 #include <conty/oci.h>
-
-using json = nlohmann::json;
 
 TEST(OCI, from_json)
 {
@@ -48,4 +44,11 @@ TEST(OCI, from_json)
     )";
 
     auto spec = oci::specification::from_json(j);
+
+    EXPECT_STREQ("1.0.1", spec.version.c_str());
+    EXPECT_EQ(spec.hooks.on_create_rt_depr.size(), 2);
+    EXPECT_EQ(spec.hooks.on_create_rt.size(), 0);
+    EXPECT_EQ(spec.hooks.on_start_cont.size(), 0);
+    EXPECT_EQ(spec.hooks.on_running_cont.size(), 1);
+    EXPECT_EQ(spec.hooks.on_stopped_cont.size(), 1);
 }

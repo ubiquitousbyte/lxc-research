@@ -1,4 +1,3 @@
-#include <string.h>
 #include <utility>
 
 #include <conty/oci.h>
@@ -8,7 +7,7 @@
 namespace oci {
     using json = nlohmann::json;
 
-    /* Small utility to deserialize a container with a default initializer*/
+    /* Small utility to deserialize a container that has a default initializer */
     template<class T>
     void default_value(const json& j, const char *key, T& out)
     {
@@ -38,13 +37,12 @@ namespace oci {
         default_value(j, "hooks", s.hooks);
     }
 
-    specification specification::from_json(std::string json_string)    
+    specification specification::from_json(const std::string& json_string)
     {
         auto j = json::parse(json_string);
         specification s{};
         oci::from_json(j, s);
         return s;
     }
-
 };
     

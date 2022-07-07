@@ -39,7 +39,7 @@ namespace oci {
         /*
          * Creates a specification object from a json string
          */
-        static specification from_json(std::string json_string);
+        static specification from_json(const std::string& json_string);
     };
 };
 

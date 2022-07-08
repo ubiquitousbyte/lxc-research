@@ -53,6 +53,6 @@ private:
     struct impl;
     std::unique_ptr<impl> ctx;
 
-    explicit context(std::unique_ptr<impl> ctx);
+    explicit context(impl&& ctx);
 };
 #endif //CONTY_CONTY_H

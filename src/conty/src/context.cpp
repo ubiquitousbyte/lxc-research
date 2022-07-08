@@ -76,7 +76,8 @@ const context::impl::variant_table context::impl::variants = {
         { context::variant::Ipc, "ipc" },
 };
 
-context::context(std::unique_ptr<context::impl> ctx): ctx{std::move(ctx)} {}
+context::context(impl&& ctx):
+    ctx{std::make_unique<context::impl>(std::move(ctx))} {}
 
 bool context::operator==(const context &o) const
 {
@@ -143,9 +144,7 @@ context context::find(pid_t pid, enum variant v)
         throw std::system_error(errno, std::system_category(), errmsg);
     }
 
-    return context{
-        std::make_unique<context::impl>(context::impl{fd, s.st_ino, s.st_dev, v})
-    };
+    return context{{fd, s.st_ino, s.st_dev, v}};
 }
 
 context context::current(enum variant v)

@@ -10,59 +10,58 @@
 #include <unordered_map>
 #include <iostream>
 
+/*
+ * File descriptor that keeps a context alive.
+ * If the file descriptor is closed and all processes inside the context
+ * terminate, then the context gets deleted by the kernel.
+ */
+struct context_fd {
+    int value;
+
+    explicit context_fd(const char *path)
+    {
+        value = open(path, O_RDONLY | O_CLOEXEC);
+        if (value == SENTINEL)
+            throw std::system_error(errno, std::system_category());
+    }
+
+    /* Right now, context should not be copied */
+    context_fd(const context_fd&) = delete;
+    context_fd& operator=(const context_fd&) = delete;
+
+    context_fd(context_fd&& other) noexcept
+    {
+        value = std::exchange(other.value, SENTINEL);
+    }
+
+    context_fd& operator=(context_fd&& other) noexcept
+    {
+        close(value);
+        value = std::exchange(other.value, SENTINEL);
+        return *this;
+    }
+
+    ~context_fd()
+    {
+        if (value != SENTINEL)
+            close(value);
+    }
+
+private:
+    constexpr static int SENTINEL = -1;
+};
+
 struct context::impl {
     using variant_table = typename std::unordered_map<context::variant, const char*>;
-    constexpr static int FD_SENTINEL = -1;
 
-    /*
-     * fd is a file descriptor pointing to the namespace file in the
-     * proc filesystem. Keeping the file descriptor open instructs the kernel
-     * to keep the namespace alive even if all processes in that namespace
-     * have left it or have terminated.
-     */
-    int                        fd;
+    impl(context_fd fd, ino_t ino, dev_t dev, context::variant v):
+        fd{std::move(fd)}, inode{ino}, device{dev}, variant{v} {}
 
+    context_fd                 fd;
     ino_t                      inode;
     dev_t                      device;
     context::variant           variant;
     const static variant_table variants;
-
-    impl(int fd, ino_t ino, dev_t dev, enum context::variant v):
-            fd{fd}, inode{ino}, device{dev}, variant{v} {}
-
-    /* Right now, context should not be copied */
-    impl(const impl&) = delete;
-    impl& operator=(const impl&) = delete;
-
-    impl(impl&& other) noexcept
-    {
-        this->fd = other.fd;
-        this->inode = other.inode;
-        this->device = other.device;
-        this->variant = other.variant;
-        other.fd = FD_SENTINEL;
-    }
-
-    impl& operator=(impl&& other) noexcept
-    {
-        this->fd = other.fd;
-        this->inode = other.inode;
-        this->device = other.device;
-        this->variant = other.variant;
-        other.fd = FD_SENTINEL;
-        return *this;
-    }
-
-    ~impl()
-    {
-        if (this->fd != FD_SENTINEL) {
-            /*
-             * Release the file descriptor. If all processes in the context
-             * have exited, the namespace will be released by the kernel
-             */
-            close(fd);
-        }
-    }
 };
 
 /* Values must match file names in /proc/[pid]/ns */
@@ -96,9 +95,14 @@ enum context::variant context::type() const
     return this->ctx->variant;
 }
 
+ino_t context::inode() const
+{
+    return this->ctx->inode;
+}
+
 void context::join()
 {
-    int rc = setns(this->ctx->fd, this->ctx->variant);
+    int rc = setns(this->ctx->fd.value, this->ctx->variant);
     if (rc != 0) {
         const char *what = "could not join context";
         throw std::system_error(errno, std::system_category(), what);
@@ -129,23 +133,14 @@ context context::find(pid_t pid, enum variant v)
     /* Construct the file path  */
     std::snprintf(path, sizeof(path), "/proc/%d/ns/%s", pid, variant);
 
-    /*
-     * We open the file in read-only mode and make sure to atomically close
-     * it whenever this process or any child calls exec
-     */
-    int fd = open(path, O_RDONLY | O_CLOEXEC);
-    if (fd == -1)
-        throw std::system_error(errno, std::system_category(), errmsg);
+    context_fd fd{path};
 
     /* Fetch the device id and inode number uniquely identifying the context */
     struct stat s{};
-    if (fstat(fd, &s) == -1) {
-        int err = errno;
-        close(fd);
-        throw std::system_error(err, std::system_category(), errmsg);
-    }
+    if (fstat(fd.value, &s) == -1)
+        throw std::system_error(errno, std::system_category(), errmsg);
 
-    return context{{fd, s.st_ino, s.st_dev, v}};
+    return context{{std::move(fd), s.st_ino, s.st_dev, v}};
 }
 
 context context::current(enum variant v)

@@ -1,6 +1,7 @@
 #ifndef CONTY_CONTY_H
 #define CONTY_CONTY_H
 
+#include <sys/stat.h>
 #include <sched.h>
 
 #include <memory>
@@ -31,6 +32,8 @@ public:
                                      const context& ctx);
 
     enum variant type() const;
+
+    ino_t inode() const;
 
     /* Moves the calling process into this execution context */
     void join();

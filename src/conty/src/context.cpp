@@ -8,9 +8,12 @@
 #include <system_error>
 
 #include <unordered_map>
+#include <iostream>
 
 struct context::impl {
     using variant_table = typename std::unordered_map<context::variant, const char*>;
+    constexpr static int FD_SENTINEL = -1;
+
     /*
      * fd is a file descriptor pointing to the namespace file in the
      * proc filesystem. Keeping the file descriptor open instructs the kernel
@@ -24,13 +27,41 @@ struct context::impl {
     context::variant           variant;
     const static variant_table variants;
 
+    impl(int fd, ino_t ino, dev_t dev, enum context::variant v):
+            fd{fd}, inode{ino}, device{dev}, variant{v} {}
+
+    /* Right now, context should not be copied */
+    impl(const impl&) = delete;
+    impl& operator=(const impl&) = delete;
+
+    impl(impl&& other) noexcept
+    {
+        this->fd = other.fd;
+        this->inode = other.inode;
+        this->device = other.device;
+        this->variant = other.variant;
+        other.fd = FD_SENTINEL;
+    }
+
+    impl& operator=(impl&& other) noexcept
+    {
+        this->fd = other.fd;
+        this->inode = other.inode;
+        this->device = other.device;
+        this->variant = other.variant;
+        other.fd = FD_SENTINEL;
+        return *this;
+    }
+
     ~impl()
     {
-        /*
-         * Release the file descriptor. If all processes in the context
-         * have exited, the namespace will be released by the kernel
-         */
-        close(fd);
+        if (this->fd != FD_SENTINEL) {
+            /*
+             * Release the file descriptor. If all processes in the context
+             * have exited, the namespace will be released by the kernel
+             */
+            close(fd);
+        }
     }
 };
 

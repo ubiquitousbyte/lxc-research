@@ -140,8 +140,9 @@ context context::find(pid_t pid, enum variant v)
     /* Fetch the device id and inode number uniquely identifying the context */
     struct stat s{};
     if (fstat(fd, &s) == -1) {
+        int err = errno;
         close(fd);
-        throw std::system_error(errno, std::system_category(), errmsg);
+        throw std::system_error(err, std::system_category(), errmsg);
     }
 
     return context{{fd, s.st_ino, s.st_dev, v}};

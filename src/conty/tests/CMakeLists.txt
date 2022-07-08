@@ -10,9 +10,9 @@ FetchContent_MakeAvailable(googletest)
 add_executable(oci-test oci-test.cpp)
 target_link_libraries(oci-test PRIVATE conty gtest_main)
 
-add_executable(resource-namespace-test resource-namespace-test.cpp)
-target_link_libraries(resource-namespace-test PRIVATE conty gtest_main)
+add_executable(context-test context-test.cpp)
+target_link_libraries(context-test PRIVATE conty gtest_main)
 
 include(GoogleTest)
 gtest_discover_tests(oci-test)
-gtest_discover_tests(resource-namespace-test)
+gtest_discover_tests(context-test)

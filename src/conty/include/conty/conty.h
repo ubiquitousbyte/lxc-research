@@ -1,60 +1,58 @@
 #ifndef CONTY_CONTY_H
 #define CONTY_CONTY_H
 
-#include <cstdlib>
+#include <sched.h>
 
+#include <memory>
 #include <ostream>
 
-class resource_namespace {
+/*
+ *  A context is a wrapper around a system resource.
+ *  Only processes inside the context can see and use the resource.
+ */
+class context {
 public:
-    /**
-     * The namespace type
-     */
-    enum class type: char {
-        Cgroup,
-        Ipc,
-        Net,
-        Mount,
-        Pid,
-        Time,
-        User,
-        Uts
+    /* The context variant represents the resource that the context wraps */
+    enum variant {
+        Cgroup = CLONE_NEWCGROUP,
+        Ipc = CLONE_NEWIPC,
+        Net = CLONE_NEWNET,
+        Mount = CLONE_NEWNS,
+        Pid = CLONE_NEWPID,
+        User = CLONE_NEWUSER,
+        Uts = CLONE_NEWUTS
     };
 
-    bool operator==(const resource_namespace& o) const;
+    /* Contexts can be uniquely identified and therefore compared */
+    bool operator==(const context& o) const;
 
+    /* Prints the context to stdout as defined in /proc */
     friend std::ostream& operator <<(std::ostream& stream,
-                                     const resource_namespace& ns);
+                                     const context& ctx);
 
-    /**
-     * @return the type of this namespace
-     */
-    enum type namespace_type() const;
+    enum variant type() const;
 
-    /**
-     * @return the inode number of this namespace
-     */
-    ino_t inode() const;
+    /* Moves the calling process into this execution context */
+    void join();
 
     /*
-     * Retrieves the namespace of the given type from the proc pseudo-filesystem
-     * for the process identified by pid.
+     * Detaches the calling process from its current set of contexts
+     * The contexts to detach from are specified in the variants.
+     * The context::variant types can be ORed and used here
      */
-    static resource_namespace from_proc(pid_t pid, enum type type);
+    static void detach(int variants);
 
-    /**
-     * Retrieves the namespace of the given type for the current process
-     * @param type the namespace type
-     * @return the namespace to which the current process belongs to
-     */
-    static resource_namespace current(enum type type);
+    /* Finds the context of the process identified by pid with the variant v */
+    static context find(pid_t pid, enum variant v);
 
+    /* Finds the context of the current process */
+    static context current(enum variant v);
+
+    ~context();
 private:
-    resource_namespace(dev_t device, ino_t node, enum type type);
+    struct impl;
+    std::unique_ptr<impl> ctx;
 
-    dev_t device;
-    ino_t node;
-    type  type;
+    explicit context(std::unique_ptr<impl> ctx);
 };
-
 #endif //CONTY_CONTY_H

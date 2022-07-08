@@ -19,7 +19,7 @@ add_library(conty STATIC)
 target_sources(conty 
     PRIVATE
         ${CONTY_PRIVATE}/oci.cpp
-        ${CONTY_PRIVATE}/resource-namespace.cpp
+        ${CONTY_PRIVATE}/context.cpp
     PUBLIC
         ${CONTY_PUBLIC_HDR}/oci.h
         ${CONTY_PUBLIC_HDR}/conty.h)

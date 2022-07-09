@@ -7,14 +7,14 @@
 
 TEST(conty_ns, open_invalid_id)
 {
-    struct conty_ns *ns = conty_ns_open(0, CONTY_NS_UTS);
+    struct conty_ns *ns = conty_ns_open(0, CLONE_NEWUTS);
     EXPECT_EQ(errno, ESRCH);
     EXPECT_TRUE(ns == NULL);
 }
 
 TEST(conty_ns, open)
 {
-    struct conty_ns *ns = conty_ns_open(getpid(), CONTY_NS_UTS);
+    struct conty_ns *ns = conty_ns_open(getpid(), CLONE_NEWUTS);
     EXPECT_TRUE(ns != NULL);
 
     ino_t inode = conty_ns_inode(ns);
@@ -26,8 +26,8 @@ TEST(conty_ns, open)
 
 TEST(conty_ns, is)
 {
-    struct conty_ns *left = conty_ns_open_current(CONTY_NS_UTS);
-    struct conty_ns *right = conty_ns_open(getpid(), CONTY_NS_UTS);
+    struct conty_ns *left = conty_ns_open_current(CLONE_NEWUTS);
+    struct conty_ns *right = conty_ns_open(getpid(), CLONE_NEWUTS);
     EXPECT_TRUE(conty_ns_is(left, right));
 }
 
@@ -41,7 +41,7 @@ TEST(conty_ns, detach_and_fork_join)
     EXPECT_EQ(rc, 0);
 
     /* Get an in-memory handle on the newly-created uts namespace */
-    struct conty_ns *ns = conty_ns_open_current(CONTY_NS_UTS);
+    struct conty_ns *ns = conty_ns_open_current(CLONE_NEWUTS);
 
     /* Spawn a child */
     pid_t child = fork();
@@ -51,7 +51,7 @@ TEST(conty_ns, detach_and_fork_join)
         rc = conty_ns_join(ns);
 
         /* The child gets an in-memory handle to its uts namespace */
-        struct conty_ns *child_ns = conty_ns_open_current(CONTY_NS_UTS);
+        struct conty_ns *child_ns = conty_ns_open_current(CLONE_NEWUTS);
 
         EXPECT_EQ(rc, 0);
         /* Make sure the child namespace and parent namespace are the same */
@@ -65,7 +65,7 @@ TEST(conty_ns, detach_and_fork_join)
 
 TEST(conty_ns, parent_nonhierarchical_ns)
 {
-    struct conty_ns *ns = conty_ns_open_current(CONTY_NS_UTS);
+    struct conty_ns *ns = conty_ns_open_current(CLONE_NEWUTS);
     EXPECT_TRUE(ns != NULL);
     EXPECT_TRUE(conty_ns_parent(ns) == NULL);
     EXPECT_EQ(errno, EINVAL);
@@ -74,7 +74,7 @@ TEST(conty_ns, parent_nonhierarchical_ns)
 TEST(conty_ns, parent)
 {
     /* Get a handle on the current pid namespace */
-    struct conty_ns *init_pid_ns = conty_ns_open_current(CONTY_NS_PID);
+    struct conty_ns *init_pid_ns = conty_ns_open_current(CLONE_NEWPID);
     EXPECT_TRUE(init_pid_ns != NULL);
 
     /*
@@ -93,7 +93,7 @@ TEST(conty_ns, parent)
 
     if (child == 0) {
         /* Get a handle on the child pid namespace */
-        struct conty_ns *child_pid_ns = conty_ns_open_current(CONTY_NS_PID);
+        struct conty_ns *child_pid_ns = conty_ns_open_current(CLONE_NEWPID);
         EXPECT_FALSE(conty_ns_is(init_pid_ns, child_pid_ns));
 
         /* Get a handle on the parent pid namespace of this child */

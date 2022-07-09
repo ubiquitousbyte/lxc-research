@@ -26,14 +26,14 @@ struct conty_ns {
     ino_t         ino;
     dev_t         dev;
 
-    conty_ns_type type;
+    int           type;
 };
 
 /*
  * The caller must ensure that fd is a descriptor pointing
  * to an actual namespace object
  */
-static struct conty_ns *conty_ns_from_fd(int fd)
+static struct conty_ns *__conty_ns_from_fd(int fd, int type)
 {
     /* Fetch the inode number and device id from the kernel */
     struct stat metadata;
@@ -47,31 +47,34 @@ static struct conty_ns *conty_ns_from_fd(int fd)
     namespace->fd = fd;
     namespace->ino = metadata.st_ino;
     namespace->dev = metadata.st_dev;
+    namespace->type = type;
 
     return namespace;
 }
 
-const static char *const conty_ns_name_table[CONTY_NS_MAX] = {
-        [CONTY_NS_CGROUP] = "cgroup",
-        [CONTY_NS_IPC]    = "ipc",
-        [CONTY_NS_MOUNT]  = "mount",
-        [CONTY_NS_NET]    = "net",
-        [CONTY_NS_PID]    = "pid",
-        [CONTY_NS_USER]   = "user",
-        [CONTY_NS_UTS]    = "uts"
-};
+static const char *conty_ns_flag_to_name(int flag)
+{
+    switch (flag) {
+    case CLONE_NEWUSER:
+        return "user";
+    case CLONE_NEWPID:
+        return "pid";
+    case CLONE_NEWUTS:
+        return "uts";
+    case CLONE_NEWNET:
+        return "net";
+    case CLONE_NEWIPC:
+        return "ipc";
+    case CLONE_NEWCGROUP:
+        return "cgroup";
+    case CLONE_NEWNS:
+        return "mnt";
+    default:
+        return NULL;
+    }
+}
 
-const static int conty_ns_flag_table[CONTY_NS_MAX] = {
-        [CONTY_NS_CGROUP] = CLONE_NEWCGROUP,
-        [CONTY_NS_IPC]    = CLONE_NEWIPC,
-        [CONTY_NS_MOUNT]  = CLONE_NEWNS,
-        [CONTY_NS_NET]    = CLONE_NEWNET,
-        [CONTY_NS_PID]    = CLONE_NEWPID,
-        [CONTY_NS_USER]   = CLONE_NEWUSER,
-        [CONTY_NS_UTS]    = CLONE_NEWUTS
-};
-
-struct conty_ns *conty_ns_open(pid_t pid, conty_ns_type type)
+struct conty_ns *conty_ns_open(pid_t pid, int type)
 {
     if (pid < 1) {
         errno = ESRCH;
@@ -79,7 +82,11 @@ struct conty_ns *conty_ns_open(pid_t pid, conty_ns_type type)
     }
 
     char path[sizeof("/proc/xxxxxxxxxxxxxxxxxxxx/ns/cgroup")];
-    const char *ns_name = conty_ns_name_table[type];
+    const char *ns_name = conty_ns_flag_to_name(type);
+    if (!ns_name) {
+        errno = EINVAL;
+        return NULL;
+    }
 
     snprintf(path, sizeof(path), "/proc/%d/ns/%s", pid, ns_name);
 
@@ -91,19 +98,26 @@ struct conty_ns *conty_ns_open(pid_t pid, conty_ns_type type)
     if (fd < 0)
         return NULL;
 
-    struct conty_ns *namespace = conty_ns_from_fd(fd);
+    struct conty_ns *namespace = __conty_ns_from_fd(fd, type);
     if (!namespace) {
         close(fd);
         return NULL;
     }
-    namespace->type = type;
 
     return namespace;
 }
 
-struct conty_ns *conty_ns_open_current(conty_ns_type type)
+struct conty_ns *conty_ns_open_current(int type)
 {
     return conty_ns_open(getpid(), type);
+}
+
+struct conty_ns *conty_ns_from_fd(int fd)
+{
+    int ns_type = ioctl(fd, NS_GET_NSTYPE);
+    if (ns_type < 0)
+        return NULL;
+    return __conty_ns_from_fd(fd, ns_type);
 }
 
 int conty_ns_is(const struct conty_ns *left, const struct conty_ns *right)
@@ -123,7 +137,7 @@ dev_t conty_ns_device(const struct conty_ns *ns)
 
 int conty_ns_join(const struct conty_ns *ns)
 {
-    int rc = setns(ns->fd, conty_ns_flag_table[ns->type]);
+    int rc = setns(ns->fd, ns->type);
     if (rc != 0)
         rc = -errno;
     return rc;
@@ -142,7 +156,7 @@ int conty_ns_detach(int flags)
 
 struct conty_ns *conty_ns_parent(const struct conty_ns *ns)
 {
-    if (ns->type != CONTY_NS_USER && ns->type != CONTY_NS_PID) {
+    if (ns->type != CLONE_NEWUSER && ns->type != CLONE_NEWPID) {
         /*
          * Parent relationships exist solely in hierarchical namespaces.
          * As of now, only the user and pid namespaces are hierarchical,
@@ -156,12 +170,11 @@ struct conty_ns *conty_ns_parent(const struct conty_ns *ns)
     if (pfd < 0)
         return NULL;
 
-    struct conty_ns *parent = conty_ns_from_fd(pfd);
+    struct conty_ns *parent = __conty_ns_from_fd(pfd, ns->type);
     if (!parent) {
         close(pfd);
         return NULL;
     }
-    parent->type = ns->type;
 
     return parent;
 }

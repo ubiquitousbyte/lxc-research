@@ -96,8 +96,8 @@ struct conty_ns *conty_ns_open(pid_t pid, conty_ns_type type)
         close(fd);
         return NULL;
     }
-
     namespace->type = type;
+
     return namespace;
 }
 
@@ -157,6 +157,10 @@ struct conty_ns *conty_ns_parent(const struct conty_ns *ns)
         return NULL;
 
     struct conty_ns *parent = conty_ns_from_fd(pfd);
+    if (!parent) {
+        close(pfd);
+        return NULL;
+    }
     parent->type = ns->type;
 
     return parent;

@@ -40,6 +40,11 @@ struct conty_ns *conty_ns_parent(const struct conty_ns *ns);
 
 void conty_ns_close(struct conty_ns *ns);
 
+struct conty_user_ns {
+    struct conty_ns      *ns;
+    struct conty_user_ns *parent;
+};
+
 #ifdef __cplusplus
 }; // extern "C"
 #endif

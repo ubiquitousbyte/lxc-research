@@ -25,7 +25,9 @@ struct conty_ns {
      */
     ino_t         ino;
     dev_t         dev;
-
+    /*
+     * The flag identifying the namespace type
+     */
     int           type;
 };
 
@@ -81,13 +83,13 @@ struct conty_ns *conty_ns_open(pid_t pid, int type)
         return NULL;
     }
 
-    char path[sizeof("/proc/xxxxxxxxxxxxxxxxxxxx/ns/cgroup")];
     const char *ns_name = __conty_ns_flag_to_name(type);
     if (!ns_name) {
         errno = EINVAL;
         return NULL;
     }
 
+    char path[sizeof("/proc/xxxxxxxxxxxxxxxxxxxx/ns/cgroup")];
     snprintf(path, sizeof(path), "/proc/%d/ns/%s", pid, ns_name);
 
     /*

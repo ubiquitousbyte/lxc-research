@@ -36,6 +36,8 @@ int conty_ns_join(const struct conty_ns *ns);
 
 int conty_ns_detach(int flags);
 
+struct conty_ns *conty_ns_parent(const struct conty_ns *ns);
+
 void conty_ns_close(struct conty_ns *ns);
 
 #ifdef __cplusplus

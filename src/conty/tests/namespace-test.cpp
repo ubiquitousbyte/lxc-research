@@ -62,3 +62,45 @@ TEST(conty_ns, detach_and_fork_join)
     /* Wait for child */
     EXPECT_EQ(waitpid(child, NULL, 0), child);
 }
+
+TEST(conty_ns, parent_nonhierarchical_ns)
+{
+    struct conty_ns *ns = conty_ns_open_current(CONTY_NS_UTS);
+    EXPECT_TRUE(ns != NULL);
+    EXPECT_TRUE(conty_ns_parent(ns) == NULL);
+    EXPECT_EQ(errno, EINVAL);
+}
+
+TEST(conty_ns, parent)
+{
+    /* Get a handle on the current pid namespace */
+    struct conty_ns *init_pid_ns = conty_ns_open_current(CONTY_NS_PID);
+    EXPECT_TRUE(init_pid_ns != NULL);
+
+    /*
+     * Detach the current process into a new pid namespace
+     * Note that the parent is still in the original namespace.
+     * Otherwise, its pid will have to change which is a no go
+     * Instead, all children forked from this process will reside in the
+     * newly allocated namespace
+     */
+    int rc = conty_ns_detach(CLONE_NEWPID);
+    EXPECT_EQ(rc, 0);
+
+    /* Fork a child that will be put in the new pid namespace */
+    pid_t child = fork();
+    EXPECT_NE(child, -1);
+
+    if (child == 0) {
+        /* Get a handle on the child pid namespace */
+        struct conty_ns *child_pid_ns = conty_ns_open_current(CONTY_NS_PID);
+        EXPECT_FALSE(conty_ns_is(init_pid_ns, child_pid_ns));
+
+        /* Get a handle on the parent pid namespace of this child */
+        struct conty_ns *child_parent_pid_ns = conty_ns_parent(child_pid_ns);
+        EXPECT_TRUE(conty_ns_is(child_parent_pid_ns, init_pid_ns));
+    }
+
+    /* Wait for child */
+    EXPECT_EQ(waitpid(child, NULL, 0), child);
+}

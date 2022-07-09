@@ -7,8 +7,10 @@
 #include <errno.h>
 #include <stdio.h>
 #include <sched.h>
-#include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/ioctl.h>
+#include <linux/nsfs.h>
 
 struct conty_ns {
     /*
@@ -26,6 +28,28 @@ struct conty_ns {
 
     conty_ns_type type;
 };
+
+/*
+ * The caller must ensure that fd is a descriptor pointing
+ * to an actual namespace object
+ */
+static struct conty_ns *conty_ns_from_fd(int fd)
+{
+    /* Fetch the inode number and device id from the kernel */
+    struct stat metadata;
+    if (fstat(fd, &metadata) == -1)
+        return NULL;
+
+    struct conty_ns *namespace = calloc(1, sizeof(struct conty_ns));
+    if (!namespace)
+        return NULL;
+
+    namespace->fd = fd;
+    namespace->ino = metadata.st_ino;
+    namespace->dev = metadata.st_dev;
+
+    return namespace;
+}
 
 const static char *const conty_ns_name_table[CONTY_NS_MAX] = {
         [CONTY_NS_CGROUP] = "cgroup",
@@ -67,20 +91,13 @@ struct conty_ns *conty_ns_open(pid_t pid, conty_ns_type type)
     if (fd < 0)
         return NULL;
 
-    /* Fetch the inode number and device id from the kernel */
-    struct stat metadata;
-    if (fstat(fd, &metadata) == -1)
+    struct conty_ns *namespace = conty_ns_from_fd(fd);
+    if (!namespace) {
+        close(fd);
         return NULL;
+    }
 
-    struct conty_ns *namespace = calloc(1, sizeof(struct conty_ns));
-    if (!namespace)
-        return NULL;
-
-    namespace->fd = fd;
-    namespace->ino = metadata.st_ino;
-    namespace->dev = metadata.st_dev;
     namespace->type = type;
-
     return namespace;
 }
 
@@ -121,6 +138,28 @@ int conty_ns_detach(int flags)
     if (rc != 0)
         rc = -errno;
     return rc;
+}
+
+struct conty_ns *conty_ns_parent(const struct conty_ns *ns)
+{
+    if (ns->type != CONTY_NS_USER && ns->type != CONTY_NS_PID) {
+        /*
+         * Parent relationships exist solely in hierarchical namespaces.
+         * As of now, only the user and pid namespaces are hierarchical,
+         * so we check that here to avoid redundant ioctling
+         */
+        errno = EINVAL;
+        return NULL;
+    }
+
+    int pfd = ioctl(ns->fd, NS_GET_PARENT);
+    if (pfd < 0)
+        return NULL;
+
+    struct conty_ns *parent = conty_ns_from_fd(pfd);
+    parent->type = ns->type;
+
+    return parent;
 }
 
 void conty_ns_close(struct conty_ns *ns)

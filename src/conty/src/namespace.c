@@ -52,7 +52,7 @@ static struct conty_ns *__conty_ns_from_fd(int fd, int type)
     return namespace;
 }
 
-static const char *conty_ns_flag_to_name(int flag)
+static const char *__conty_ns_flag_to_name(int flag)
 {
     switch (flag) {
     case CLONE_NEWUSER:
@@ -82,7 +82,7 @@ struct conty_ns *conty_ns_open(pid_t pid, int type)
     }
 
     char path[sizeof("/proc/xxxxxxxxxxxxxxxxxxxx/ns/cgroup")];
-    const char *ns_name = conty_ns_flag_to_name(type);
+    const char *ns_name = __conty_ns_flag_to_name(type);
     if (!ns_name) {
         errno = EINVAL;
         return NULL;

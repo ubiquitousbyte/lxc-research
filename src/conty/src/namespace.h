@@ -7,8 +7,6 @@ extern "C" {
 
 #include <sys/types.h>
 
-#define CONTY_NS_MAX (CONTY_NS_UTS + 1)
-
 struct conty_ns;
 
 struct conty_ns *conty_ns_open(pid_t pid, int type);

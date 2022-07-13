@@ -104,3 +104,35 @@ TEST(conty_ns, parent)
     /* Wait for child */
     EXPECT_EQ(waitpid(child, NULL, 0), child);
 }
+
+TEST(conty_ns_id_map, init)
+{
+    char buf[CONTY_NS_ID_MAP_MAX];
+    struct conty_ns_id_map map;
+    int rc;
+
+    rc = conty_ns_id_map_init(&map, buf, sizeof(buf));
+
+    EXPECT_EQ(rc, 0);
+    EXPECT_EQ(map.cap, CONTY_NS_ID_MAP_MAX);
+    EXPECT_EQ(map.written, 0);
+
+    char buf2[CONTY_NS_ID_MAP_MAX*2];
+    rc = conty_ns_id_map_init(&map, buf2, sizeof(buf2));
+
+    EXPECT_EQ(rc, -ENOSPC);
+}
+
+TEST(conty_ns_id_map, put)
+{
+    char buf[CONTY_NS_ID_MAP_MAX];
+    struct conty_ns_id_map map;
+    int rc;
+    EXPECT_EQ(conty_ns_id_map_init(&map, buf, sizeof(buf)), 0);
+
+    rc = conty_ns_id_map_put(&map, 0, 100, 5);
+
+    EXPECT_EQ(rc, 0);
+
+    EXPECT_EQ(map.written, strlen("0 100 5\n"));
+}

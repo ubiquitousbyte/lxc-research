@@ -708,14 +708,50 @@ The parent process often wants to gather information about when and how a child 
 This functionality is provided by \verb|wait()| and \verb|waitpid()|, as already shown in 
 (\ref{code:os-concepts/src/clone.c}), (\ref{code:os-concepts/src/exit-normal.c-exec}) and (\ref{code:os-concepts/src/exit-abnormal.c-exec}).
 
-
 %The parent is required to reap 
 %the child. Otherwise, the identifier of the child will not be removed from the system-wide 
 %table of process identifiers.
 
 \subsection{Communication}
 \label{ch:fundamentals/processes/communication}
+TODO
 \subsection{Resource Management}
 \label{ch:fundamentals/processes/resource-management}
+TODO 
 \subsection{Security}
 \label{ch:fundamentals/processes/security}
+Every process is associated with a set of credentials. 
+The traditional UNIX security model defines these credentials 
+as a set of unique numerical user and group identifiers. The \textit{real} user and group identifiers 
+represent the user to which the process belongs. They are read from the 
+password database as part of the login procedure \cite{10.5555/1869911}. 
+Every process spawned by the user inherits the real user and group identifiers as part of 
+its credentials. 
+The credentials themselves further consist of an \textit{effective} user and an effective group identifier,
+which are used by the kernel to authorise and execute operations on behalf of the process \cite{10.5555/1869911}.
+For example, when a process attempts to read a file, the kernel checks if the effective user ID
+of the process matches the user ID of the owner of the file, or if the effective group ID matches the 
+owner's group ID. If any of these predicates holds, then the effective user - and therefore the process - 
+is deemed trustworthy to call the \verb|read| system call on a file descriptor referencing the file.
+Typically, the effective user and group identifiers match their real counterparts. However, there 
+are programs that can ambiently change the effective identifiers of a process to match 
+those of the user that created them \cite{10.5555/1869911}. These programs are known as 
+\textit{set-user-id} and \textit{set-group-id} programs. Every executable file is associated with 
+a set-user-id and a set-group-id permission bit that can be set by that file's owner. 
+If the set-user-id permission bit is set and another user executes the program, the process
+obtains the effective user identifier of the file's owner, not the user that started the process \cite{10.5555/1869911}.
+A classic example of a set-user-id program is \verb|sudo|, which executes arbitrary commands as the 
+root user. Since the \verb|sudo| executable file is
+owned by the root user and has the set-user-id bit toggled, any user cam execute any command 
+in a process with full privileges. Another example is the \verb|passwd| utility which allows a user 
+to change her password and therefore requires write access to the password database.  
+
+%The \verb|newuidmap| program first obtains the passwd structure associated with the 
+%real user id of the calling process. In addition, it obtains a handle to the 
+%real user id of the owner of the \verb|/proc/[pid]| directory to which 
+%the new user mappings are to be written. The user executing the \verb|newuidmap|
+%must be the same as the user that owns the \verb|/proc/[pid]| directory. 
+%If that is the case, the id mappings specified by the caller are validated against overflows and 
+%the database of subordinate identifiers is opened (\verb|/etc/subuid|).
+%This database contains a mapping between a user on the host system and a range of identifiers 
+%that this user is allowed to put in the \verb|/proc/[pid]/uid_map| file.

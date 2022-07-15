@@ -148,9 +148,14 @@ int conty_ns_join(const struct conty_ns *ns)
 int conty_ns_detach(int flags)
 {
     /*
-     * We switch off any bits in the mask unrelated to namespace configurations
+     * Any bits in the mask unrelated to namespace configuration
+     * effectively render the operation invalid
      */
-    int rc = unshare(flags & ~(CLONE_FS | CLONE_FILES | CLONE_SYSVSEM));
+    if (flags & (CLONE_FS | CLONE_FILES | CLONE_SYSVSEM | CLONE_VM |
+                 CLONE_SETTLS | CLONE_CHILD_SETTID | CLONE_PARENT_SETTID))
+        return -EINVAL;
+
+    int rc = unshare(flags);
     if (rc != 0)
         rc = -errno;
     return rc;
@@ -201,16 +206,17 @@ int conty_ns_id_map_init(struct conty_ns_id_map *m, char *buf, size_t buf_size)
     return 0;
 }
 
-int conty_ns_id_map_put(struct conty_ns_id_map *m, int left, int right, int range)
+int conty_ns_id_map_put(struct conty_ns_id_map *m, unsigned left,
+                        unsigned right, unsigned range)
 {
     if (range < 1)
         return -EINVAL;
 
-    size_t spc = snprintf(NULL, 0, "%d %d %d\n", left, right, range);
+    size_t spc = snprintf(NULL, 0, "%u %u %u\n", left, right, range);
     if (m->written + spc > m->cap)
         return -ENOSPC;
 
-    sprintf(&m->buf[m->written], "%d %d %d\n", left, right, range);
+    sprintf(&m->buf[m->written], "%u %u %u\n", left, right, range);
     m->written += spc;
 
     return 0;

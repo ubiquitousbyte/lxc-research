@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 #include <stddef.h>
+#include <stdint.h>
 
 #include <sys/types.h>
 
@@ -46,7 +47,8 @@ struct conty_ns_id_map {
 
 int conty_ns_id_map_init(struct conty_ns_id_map *m, char *buf, size_t buf_size);
 
-int conty_ns_id_map_put(struct conty_ns_id_map *m, int left, int right, int range);
+int conty_ns_id_map_put(struct conty_ns_id_map *m, unsigned left,
+                        unsigned right, unsigned range);
 
 #ifdef __cplusplus
 }; // extern "C"

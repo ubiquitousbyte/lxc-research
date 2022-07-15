@@ -746,6 +746,57 @@ owned by the root user and has the set-user-id bit toggled, any user cam execute
 in a process with full privileges. Another example is the \verb|passwd| utility which allows a user 
 to change her password and therefore requires write access to the password database.  
 
+Notice that the UNIX security model differentiates only between privileged and unprivileged processes.
+The former are not subjected to permission checking and have full control of the system - they can 
+reboot the system, set the system time, kill other processes and so on. 
+If a set-user-id or a set-group-id program exhibits unexpected behaviour, either due to malicious manipulation or 
+programming errors, this coarse-grained security model is unable to prevent a full system exploitation.
+The Linux capability scheme tries to solve this problem by unbinding privileges from the root 
+user and dividing them into components called \textit{capabilities}. A capability is represented as 
+a single bit that is a part of a 64-bit wide bit mask, called a \textit{capability set}.
+Every process is associated with a \textit{permitted}, \textit{inheritable}, \textit{effective}, 
+\textit{bounding} and \textit{ambient} capability set. 
+%In addition, every executable file may optionally 
+%be associated with its own permitted and inheritable sets.
+Whenever a process starts a child, that child inherits the capability sets of its parent.
+The effective capability set of a process
+is used by the kernel to perform permission checks. The permitted capability set acts as a 
+superset that restricts the effective capabilities that a process can assume. 
+If a process drops a capability from its permitted set, it cannot acquire that capability any more.
+
+Executable files may also be associated with permitted and inheritable capability sets. 
+Such files are said to be privileged. 
+Whenever a process loads an executable into memory, the permitted and inheritable capability 
+sets of the file interact with those of the process to determine the process's new set 
+of capabilities. We denote a process that has not loaded an executable file as $P$, the executable 
+file as $F$ and the process with the executable file loaded as $P^{\prime}$. 
+When a process loads an unprivileged executable file, i.e a file that has no capability sets, 
+then the ambient capability set defines the capabilities used by the kernel 
+for permission checking as well as the limiting superset of those capabilities, i.e 
+\begin{align}
+    P^{\prime}(\textrm{permitted}) = P(\textrm{ambient}) \\
+    P^{\prime}(\textrm{effective}) = P(\textrm{ambient}).
+\end{align}
+The rest of the capability sets remain unchanged. Conversely, when a process loads a privileged 
+executable file into memory, the other capability sets become important. 
+The inheritable set of a process 
+defines a group of capabilities that may be preserved across an execution boundary. 
+All capabilities present in both the process inheritable set and the file inheritable set 
+are added to the process permitted set. In other words, the inheritable sets are intersected.
+The process bounding set protects the process from acquiring capabilities defined in the file 
+permitted set that it does not want. The bounding set is intersected with the file permitted 
+set and the result is added to the process permitted set. 
+\begin{align}
+    P^{\prime}({\textrm{permitted}}) = (F(\textrm{permitted}) \mathbin{\&} P(\textrm{bounding})) \mathbin{|} (F(\textrm{inheritable}) \mathbin{\&} P(\textrm{inheritable}))
+    \label{equation:fundamentals/caps-priv-file-permitted-set}
+\end{align}
+
+Equation (\ref{equation:fundamentals/caps-priv-file-permitted-set}) shows how the 
+permitted capability set of a process that loads a privileged exeutable file is updated. 
+We can see that the process can effectively protect itself from executing potentially malicious
+executables by restricting its bounding and inheritable sets before loading the program 
+into memory. 
+
 %The \verb|newuidmap| program first obtains the passwd structure associated with the 
 %real user id of the calling process. In addition, it obtains a handle to the 
 %real user id of the owner of the \verb|/proc/[pid]| directory to which 

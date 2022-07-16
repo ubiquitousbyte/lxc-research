@@ -14,7 +14,7 @@
 static int cap_is_set(cap_t caps, cap_value_t bit, cap_flag_t set)
 {
     cap_flag_value_t ret;
-    return !cap_get_flag(caps, bit, set, &ret) && ret == CAP_SET;
+    return (!cap_get_flag(caps, bit, set, &ret)) && ret == CAP_SET;
 }
 
 int main(int argc, char*argv[])
@@ -55,4 +55,5 @@ int main(int argc, char*argv[])
            inheritable, ambient, bounding);
 
     cap_free(caps);
+    return 0;
 }

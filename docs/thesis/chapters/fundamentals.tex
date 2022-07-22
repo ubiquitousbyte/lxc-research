@@ -169,7 +169,7 @@ satisfy all three virtualisation axioms. Examples of such operating systems incl
 - the first operating system to be formally verified as free of programming errors \cite{10.1145/1629575.1629596}, 
 and Google's Fuchsia - described by \textcite{10.22667/JOWUA.2021.09.30.047}.
 
-We first consider operating system virtualisation using a user-space daemon program.
+We only consider operating system virtualisation using a user-space daemon program.
 In this architecture, an application, referred to as a \textit{container},
 is defined as an encapsulation of \enquote{[...] a software component and all its dependencies 
 in a format that is self-describing and portable, so that any compliant container runtime can run it without extra 
@@ -770,32 +770,38 @@ Whenever a process loads an executable into memory, the permitted and inheritabl
 sets of the file interact with those of the process to determine the process's new set 
 of capabilities. We denote a process that has not loaded an executable file as $P$, the executable 
 file as $F$ and the process with the executable file loaded as $P^{\prime}$. 
-When a process loads an unprivileged executable file, i.e a file that has no capability sets, 
-then the ambient capability set defines the capabilities used by the kernel 
-for permission checking as well as the limiting superset of those capabilities, i.e 
 \begin{align}
-    P^{\prime}(\textrm{permitted}) = P(\textrm{ambient}) \\
-    P^{\prime}(\textrm{effective}) = P(\textrm{ambient}).
+    P^{\prime}(\textrm{permitted})   &= P(\textrm{ambient}) \nonumber \\
+    P^{\prime}(\textrm{effective})   &= P(\textrm{ambient}) \nonumber \\
+    P^{\prime}(\textrm{ambient})     &= P(\textrm{ambient}) \nonumber \\ 
+    P^{\prime}(\textrm{inheritable}) &= P(\textrm{inheritable}).
+    \label{equation:fundamentals/caps-unpriv-file-sets}
 \end{align}
-The rest of the capability sets remain unchanged. Conversely, when a process loads a privileged 
-executable file into memory, the other capability sets become important. 
-The inheritable set of a process 
-defines a group of capabilities that may be preserved across an execution boundary. 
-All capabilities present in both the process inheritable set and the file inheritable set 
-are added to the process permitted set. In other words, the inheritable sets are intersected.
-The process bounding set protects the process from acquiring capabilities defined in the file 
-permitted set that it does not want. The bounding set is intersected with the file permitted 
-set and the result is added to the process permitted set. 
+When $P$ loads an unprivileged executable file, i.e a file $F$ such that $F(\textrm{inheritable}) = F(\textrm{permitted}) = 0$,
+then the ambient capability set governs what permissions the process has, i.e what is contained 
+in that process's permitted and effective sets, as shown in (\ref{equation:fundamentals/caps-unpriv-file-sets}).
+The ambient set obeys the invariant that it cannot contain a capability not present in 
+both the permitted and inheritable sets. Practically speaking, a nonprivileged process that has a capability 
+can add it to its ambient set, thereby allowing its children to use that capability.
+
+If $P$ loads a privileged executable file, i.e a file $F$ that has capabilities in its inheritable and permitted sets, 
+the ambient set is cleared when the executable file is loaded into memory. This ensures that 
+the parent process of $P$ does not unintentionally (ambiently) leak a capability to its potentially 
+dangerous child. The computation of the process's new permitted set consists of two phases.
+First, all the capabilities that the process has in its inheritable set are preserved in 
+$P^{\prime}(\textrm{inheritable})$ and then intersected with the file's inheritable set.
+Only those capabilities that are preserved in the intersection are added to $P^{\prime}(\textrm{permitted})$. 
+This makes sure that a privileged executable file cannot use capabilities inherited by 
+the parent process that are not explicitly defined in its permitted set.
+Second, the file's permitted set is intersected with the process's bounding set.
+The latter acts as a limiting superset that restricts what a file can put in the process's
+permitted set, and ultimately, in its effective set. 
+The capabilities inside the intersection are added to $P^{\prime}(\textrm{permitted})$, resulting 
+in the final formula shown in (\ref{equation:fundamentals/caps-priv-file-permitted-set}).
 \begin{align}
     P^{\prime}({\textrm{permitted}}) = (F(\textrm{permitted}) \mathbin{\&} P(\textrm{bounding})) \mathbin{|} (F(\textrm{inheritable}) \mathbin{\&} P(\textrm{inheritable}))
     \label{equation:fundamentals/caps-priv-file-permitted-set}
 \end{align}
-
-Equation (\ref{equation:fundamentals/caps-priv-file-permitted-set}) shows how the 
-permitted capability set of a process that loads a privileged exeutable file is updated. 
-We can see that the process can effectively protect itself from executing potentially malicious
-executables by restricting its bounding and inheritable sets before loading the program 
-into memory. 
 
 %The \verb|newuidmap| program first obtains the passwd structure associated with the 
 %real user id of the calling process. In addition, it obtains a handle to the 

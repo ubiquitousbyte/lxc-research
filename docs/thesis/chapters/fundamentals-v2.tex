@@ -74,7 +74,7 @@ part of the namespace can see and manipulate the resource. Namespaces are implem
 kernel and are therefore a part of the trusted computing base. Container runtimes use them 
 to establish a solid noninterference boundary between processes by restricting their view of the system. 
 The system calls \verb|clone|, \verb|unshare|, \verb|setns| and \verb|ioctl|, as well as the 
-\verb|procfs| pseudo-filesystem are the primary interaction points between a user-space program and a namespace.  
+\verb|proc| pseudo file system are the primary interaction points between a user-space program and a namespace.  
 
 Every process is associated with a fixed-size set of namespaces, called the \textit{namespace proxy}, that corresponds to the
 resources that it can access.
@@ -92,7 +92,7 @@ In addition, the caller passes a set of configuration options that define the ch
 The parent can put the child in a freshly-allocated set of namespaces by ORing a set of flags 
 and injecting the result into the configuration set. It is important to note that the 
 configuration set is very flexible and defines the noninterference boundary between the child and its parent. 
-The parent can use it to share its virtual memory pages, file-descriptor table and filesystem information 
+The parent can use it to share its virtual memory pages, file descriptor table and file system information 
 with the child, thereby weakening the boundary. 
 \verb|unshare()| allows an already existing process to regulate its noninterference boundary by
 \enquote{disassociating parts of its execution context}. In other words, a process can 
@@ -165,7 +165,7 @@ credentials in the user namespace that owns the resource.
 Hence, on its own, a user namespace is not particularly useful because it does not 
 own any resources. If created in pair with other namespaces, however, it becomes 
 extremely useful.
-\begin{lstlisting}[label={code:usr-ns}, style=bash, caption={Example of resource ownership semantics with user namespaces}]
+\begin{lstlisting}[label={code:fundamentals/namespaces/user-example}, style=bash, caption={Example of resource ownership semantics with user namespaces}]
 $ id -u && cat /proc/$$/status | grep CapEff
 1000
 CapEff:	0000000000000000
@@ -180,7 +180,7 @@ $ hostname mynewhostname
 $ hostname 
 mynewhostname 
 \end{lstlisting}
-Example (\ref{code:usr-ns}) highlights how the kernel authorises operations in a user namespace.
+Example (\ref{ccode:fundamentals/namespaces/user-example}) highlights how the kernel authorises operations in a user namespace.
 First, the security context of the current process is shown. The user running the shell has no capabilities. 
 The \verb|unshare -U -r| command moves the shell into a newly-created user namespace. 
 We can see that the process has obtained a superuser security context with a full effective 
@@ -293,6 +293,25 @@ PID TTY TIME CMD
 
 \subsection{Mount Namespace}
 \label{sections:fundamentals/namespaces/mount}
+\begin{table}[h!]
+    \centering
+    \begin{tabular}{ |m{4cm}|m{20em}| }
+        \hline
+        Propagation Type & Description \\
+        \hline
+        \verb|MS_SHARED| & Mount and umount events are propagated across mount namespaces. \\
+        \hline 
+        \verb|MS_PRIVATE| & Mount and umount events are local. The mount point does not propagate, nor does it receive mount and umount events. \\
+        \hline
+        \verb|MS_SLAVE| & Mount and umount events are propagated unidirectionally from a master set of mount points to a slave mount. \\
+        \hline
+        \verb|MS_UNBINDABLE| & Mount point is private and cannot be bind mounted \\
+        \hline
+    \end{tabular}
+    \caption{Table of mount point propagation types in Linux}
+    \label{table:fundamentals/namespaces/mount/propagation-types}
+\end{table}
+
 Files are multiplexed across multiple devices, each with its own intrinsic implementation details 
 for storing and managing data. The kernel abstracts the underlying idiosyncrasies 
 by arranging all files into a hierarchy that can be accessed through a well-defined programming interface. 
@@ -304,8 +323,21 @@ Mount namespaces encapsulate the list of mount points that their resident proces
 see. When a process detaches into a new mount namespace, it inherits an exact replica of the parent's mount points.
 This does not necessarily mean that a change made by the parent to an underlying mount point remains 
 invisible to the child, or vice versa. Every mount point is associated with a dedicated \textit{propagation type} 
-that determines whether or not file system events are shared across mount namespaces 
-that reference it. In essence, the propagation types governs the file system's noninterference boundary.
+that determines whether or not mount and umount events are shared across mount namespaces 
+that reference it or any mount points immediately below it in the file hierarchy.  
+In essence, the propagation type governs the file system's noninterference boundary. 
+Table \ref{table:fundamentals/namespaces/mount/propagation-types} summarises the possible 
+propagation types. The \verb|/proc/self/mountinfo| file 
+displays a multitude of mount point properties with respect to the mount namespace in which 
+the process reading the file resides in. 
+
+In addition to mounting device file systems onto the file hierarchy, we can make 
+already mounted subtrees visible at other locations in it. This concept is known as a 
+\textit{bind mount}. Bind mounts are commonly used by container engines to map directories 
+on the host system to directories inside a container. Internally, the kernel copies
+the data structures of the original mount into a new mount point inside 
+the mount namespace of the container. Changes in one mount point are reflected in the other 
+using copy on write. 
 
 \subsection{Network Namespace}
 \label{sections:fundamentals/namespaces/network}
@@ -313,8 +345,14 @@ that reference it. In essence, the propagation types governs the file system's n
 \subsection{Inter-process Communication Namespace}
 \label{sections:fundamentals/namespaces/ipc}
 
-\subsection{Time Sharing Namespace}
+\subsection{UNIX Time-Sharing Namespace}
 \label{sections:fundamentals/namespaces/uts}
+UNIX Time-Sharing (uts) namespaces encapsulate the system's host name and domain name.
+When creating a new uts namespace, the kernel simply copies the system identifiers of the 
+previous namespace and exposes the copied versions to all residents of the namespace. 
+The residents are free to change both identifiers without affecting the actual values 
+on the host. Example \ref{code:fundamentals/namespaces/user-example} already highlights 
+how to detach a shell into a new uts namespace and set its host name.
 
 \subsection{Control Group Namespace}
 \label{sections:fundamentals/namespaces/cgroups}

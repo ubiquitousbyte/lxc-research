@@ -192,11 +192,120 @@ the initial user namespace, in which our user is unprivileged as shown on lines 
 To make the new user namespace useful, we encapsulate the hostname resource in a new uts namespace 
 and move the shell process there. Afterwards, the kernel uses the security contexts of the new  
 user namespace to authorise any UNIX time-sharing operations.
-\subsection{Process Namespace}
+
+Before the advent of user namespaces,
+a container runtime was required to run with superuser privileges,  
+because the \verb|clone()| and \verb|unshare()| system calls require the \verb|CAP_SYS_ADMIN| 
+capability. Now, if the \verb|CLONE_NEWUSER| flag is set, both system calls guarantee that the 
+process will be moved in a new user namespace first, and its new security context will be used 
+to authorise the creation of the remaining set of namespaces.
+
+\subsection{Process identifier namespace}
 \label{sections:fundamentals/namespaces/process}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.55\textwidth]{images/fundamentals/pid-namespace-hierarchy.jpg}
+    \caption{PID namespace hierarchy}
+    \label{images:fundamentals/pid-namespace-hierarchy.jpg}
+\end{figure}
+Process identiifer (PID) namespaces encapsulate the mechanism of assigning 
+unique identifiers to their resident processes. Every PID namespace localises an associative 
+array, called the identifier registry, capable of allocating up to $2^{22}$ unique numbers and mapping them to arbitrary 
+pointers. Because of this localisation, processes in different namespaces can be mapped to the 
+same identifier. The first process to join a PID namespace receives the process identifier $1$ 
+and acts as the init process for the entire namespace. This process becomes the parent of 
+any orphaned children inside the namespace. Furthermore, if the init process terminates, all processes 
+in the namespace terminate as well. In this case, even if a file descriptor to the namespace is kept open, 
+i.e the namespace is kept alive by the kernel, no process is allowed to join.  
+
+Process identifier namespaces are organised into a hierarchy, 
+as shown by Figure \ref{images:fundamentals/pid-namespace-hierarchy.jpg}.
+When a process calls \verb|unshare| with the \verb|CLONE_NEWPID| flag set, 
+the kernel does not detach the process into a new PID namespace. Doing so would require 
+changing the identifier of the process.
+Instead, the kernel caches the new namespace in the process's namespace proxy and 
+spawns the process's future children into it. The new process namespace is accessible from 
+user-space via the \verb|/proc/[pid]/ns/pid_for_children| file. 
+
+We denote $N_{i}$ as the $i$-th process in namespace $N$. 
+In Figure \ref{images:fundamentals/pid-namespace-hierarchy.jpg},
+$A_{1}$ forks two children $A_{2}$ and $A_{3}$. 
+$A_{3}$ calls \verb|unshare| and registers a new PID namespace in the kernel. The process 
+subsequently forks $A_{4}$, which the kernel translates into $B_{1}$.
+Note that $A_{1}$ and $A_{2}$ can, by definition, interact with $B_{1}$ because $B_{1} = A_{4}$.  
+Hence, a process is visible to all of its peers in its namespace and to all direct ancestor
+namespaces. Conversely, $B_{2}$ and $B_{3}$ cannot see any processes in $A$. 
+Joining a PID namespace is an irrevirtible operation, i.e if $A_{2}$ joins $B$,
+then it cannot go back.
+
+PID namespaces can be nested arbitrarily up to 32 times. 
+Container runtimes do not utilise this feature, because application workloads are orthogonal 
+to each other. Nesting two application workloads, potentially stemming from two different tenants, in a hierarchy
+would enable processes resident in the ancestor namespace to kill the init process of the child namespace, which 
+is in direct conflict with the noninterference property. 
+
+\begin{lstlisting}[style=c-code-snippets, label={code:fundamentals/namespaces/process}, caption={PID namespace creation pseudocode}]
+/* pid_namespace.c */
+int err = unshare(CLONE_NEWPID);
+pid_t child = fork();
+if (child == 0) 
+    child = fork();
+    if (child == 0)
+        execlp("sleep", "sleep", "60", (char *) NULL);
+    else if (child > 0)
+        exit(waitpid(child, NULL, 0) != child);
+else 
+    return waitpid(child, NULL, 0) != child;
+\end{lstlisting}
+
+Code snippet \ref{code:fundamentals/namespaces/process} demonstrates the creation of a new 
+PID namespace with two processes. On lines 1 and 2, a new 
+pid namespace is created through the \verb|unshare| system call and its init process is forked. 
+The init process creates a new child that sleeps for 60 seconds. All processes within this 
+hierarchy await their children's completion. 
+We can run this example in a shell and list the shell's children via the \verb|ps|
+utility, as shown in Code snippet \ref{code:fundamentals/namespaces/process-cmd}. 
+You'll notice that the \verb|sleep| command is visible from the ancestor namespace and can be killed,
+i.e directly interfered with. 
+\begin{lstlisting}[label={code:fundamentals/namespaces/process-cmd}, style=bash, caption={Example of creating a PID namespace and listing all processes in the child namespace from a process in the parent namespace}]
+$ ./pid-namespace &
+[1] 78972
+$ ps
+PID TTY TIME CMD
+62983 pts/1 00:00:00 bash
+78972 pts/1 00:00:00 pid-namespace
+78973 pts/1 00:00:00 pid-namespace
+78974 pts/1 00:00:00 sleep
+79027 pts/1 00:00:00 ps
+\end{lstlisting}
+
+%This has several implications. First, 
+%this process becomes the parent of any orphaned children.
+%If it fails to reap a child, the kernel will not release the child's process identifier from 
+%the namespace identifier registry. Cumulatively pilling up the reserved identifiers may 
+%result in the inability to spawn new processes. Second, if the init process terminates, all 
+%processes in the namespace are terminated as well. 
+
+%The noninterference boundary of a PID namespace heavily relies on the correct operation of the 
+%init process. To prevent a member of the PID namespace from killing the init process and therefore 
+%interfering with its peers, the kernel only propagates signals for which the init process 
+%has established handlers for. 
 
 \subsection{Mount Namespace}
 \label{sections:fundamentals/namespaces/mount}
+Files are multiplexed across multiple devices, each with its own intrinsic implementation details 
+for storing and managing data. The kernel abstracts the underlying idiosyncrasies 
+by arranging all files into a hierarchy that can be accessed through a well-defined programming interface. 
+The process of attaching a device's file system 
+to this hierarchy is called \textit{mounting}. The position in the hierarchy where the file system 
+is attached is referred to as a \textit{mount point}.
+
+Mount namespaces encapsulate the list of mount points that their resident processes can 
+see. When a process detaches into a new mount namespace, it inherits an exact replica of the parent's mount points.
+This does not necessarily mean that a change made by the parent to an underlying mount point remains 
+invisible to the child, or vice versa. Every mount point is associated with a dedicated \textit{propagation type} 
+that determines whether or not file system events are shared across mount namespaces 
+that reference it. In essence, the propagation types governs the file system's noninterference boundary.
 
 \subsection{Network Namespace}
 \label{sections:fundamentals/namespaces/network}

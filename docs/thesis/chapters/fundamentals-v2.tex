@@ -180,7 +180,7 @@ $ hostname mynewhostname
 $ hostname 
 mynewhostname 
 \end{lstlisting}
-Example (\ref{ccode:fundamentals/namespaces/user-example}) highlights how the kernel authorises operations in a user namespace.
+Example (\ref{code:fundamentals/namespaces/user-example}) highlights how the kernel authorises operations in a user namespace.
 First, the security context of the current process is shown. The user running the shell has no capabilities. 
 The \verb|unshare -U -r| command moves the shell into a newly-created user namespace. 
 We can see that the process has obtained a superuser security context with a full effective 
@@ -219,7 +219,7 @@ in the namespace terminate as well. In this case, even if a file descriptor to t
 i.e the namespace is kept alive by the kernel, no process is allowed to join.  
 
 Process identifier namespaces are organised into a hierarchy, 
-as shown by Figure \ref{images:fundamentals/pid-namespace-hierarchy.jpg}.
+as shown by Figure (\ref{images:fundamentals/pid-namespace-hierarchy.jpg}).
 When a process calls \verb|unshare| with the \verb|CLONE_NEWPID| flag set, 
 the kernel does not detach the process into a new PID namespace. Doing so would require 
 changing the identifier of the process.
@@ -228,7 +228,7 @@ spawns the process's future children into it. The new process namespace is acces
 user-space via the \verb|/proc/[pid]/ns/pid_for_children| file. 
 
 We denote $N_{i}$ as the $i$-th process in namespace $N$. 
-In Figure \ref{images:fundamentals/pid-namespace-hierarchy.jpg},
+In Figure (\ref{images:fundamentals/pid-namespace-hierarchy.jpg}),
 $A_{1}$ forks two children $A_{2}$ and $A_{3}$. 
 $A_{3}$ calls \verb|unshare| and registers a new PID namespace in the kernel. The process 
 subsequently forks $A_{4}$, which the kernel translates into $B_{1}$.
@@ -258,13 +258,13 @@ else
     return waitpid(child, NULL, 0) != child;
 \end{lstlisting}
 
-Code snippet \ref{code:fundamentals/namespaces/process} demonstrates the creation of a new 
+Code snippet (\ref{code:fundamentals/namespaces/process}) demonstrates the creation of a new 
 PID namespace with two processes. On lines 1 and 2, a new 
 pid namespace is created through the \verb|unshare| system call and its init process is forked. 
 The init process creates a new child that sleeps for 60 seconds. All processes within this 
 hierarchy await their children's completion. 
 We can run this example in a shell and list the shell's children via the \verb|ps|
-utility, as shown in Code snippet \ref{code:fundamentals/namespaces/process-cmd}. 
+utility, as shown in Code snippet (\ref{code:fundamentals/namespaces/process-cmd}). 
 You'll notice that the \verb|sleep| command is visible from the ancestor namespace and can be killed,
 i.e directly interfered with. 
 \begin{lstlisting}[label={code:fundamentals/namespaces/process-cmd}, style=bash, caption={Example of creating a PID namespace and listing all processes in the child namespace from a process in the parent namespace}]
@@ -326,7 +326,7 @@ invisible to the child, or vice versa. Every mount point is associated with a de
 that determines whether or not mount and umount events are shared across mount namespaces 
 that reference it or any mount points immediately below it in the file hierarchy.  
 In essence, the propagation type governs the file system's noninterference boundary. 
-Table \ref{table:fundamentals/namespaces/mount/propagation-types} summarises the possible 
+Table (\ref{table:fundamentals/namespaces/mount/propagation-types}) summarises the possible 
 propagation types. The \verb|/proc/self/mountinfo| file 
 displays a multitude of mount point properties with respect to the mount namespace in which 
 the process reading the file resides in. 
@@ -336,13 +336,78 @@ already mounted subtrees visible at other locations in it. This concept is known
 \textit{bind mount}. Bind mounts are commonly used by container engines to map directories 
 on the host system to directories inside a container. Internally, the kernel copies
 the data structures of the original mount into a new mount point inside 
-the mount namespace of the container. Changes in one mount point are reflected in the other 
+container's mount namespace. Changes in one mount point are reflected in the other 
 using copy on write. 
 
 \subsection{Network Namespace}
 \label{sections:fundamentals/namespaces/network}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.65\textwidth]{images/fundamentals/net-ns-veth-arch.jpg}
+    \caption{Network architecture that enables inter-container communication via bridge and virtual ethernet devices.}
+    \label{images:fundamentals/net-ns-veth-arch.jpg}
+\end{figure}
 
-\subsection{Inter-process Communication Namespace}
+Network namespaces encapsulate the full network stack and expose it only to 
+their resident processes. This allows a collection of processes to operate on 
+dedicated network interfaces, routing tables, firewall rules and UNIX domain sockets 
+that are inaccessible to others. 
+
+The kernel imposes an important restriction. A physical network device can be attached only 
+to a single network namespace. When the network namespace is released, the phyiscal device 
+is returned back to the initial network namespace, i.e the host. To enable socket-based interprocess
+communication across network namespace boundaries, 
+the physical devices need to be multiplexed on top of virtual interfaces. 
+
+All container engines implement the same default network configuration that allows processes 
+in different network namespaces to communicate with each other. As part of its initialisation procedure,
+the container engine installs a bridge interface inside the root network namespace.
+A bridge can be thought of as a virtual network switch. 
+It forwards packets between interfaces, called slaves, that are attached to it. 
+Before detaching a process into a new network namespace, the container engine creates a 
+virtual ethernet device. Virtual ethernet devices are a software equivalent of a patch cable. 
+They are represented by a pair of interconnected endpoints. One end of the virtual ethernet device is moved 
+into the network namespace of the process, and the other remains on the host and is attached 
+to the bridge. Because the bridge acts as a switch, other network devices attached 
+to it can communicate with a namespaced process. Figure (\ref{images:fundamentals/net-ns-veth-arch.jpg})
+visualises such a network configuration. In it, two network namespaces, and a wlan interface
+inside the root namespace, can exchange data over the bridge. Code snippet (\ref{code:fundamentals/namespaces/network-example})
+shows how to configure such a network.
+\clearpage
+
+\begin{lstlisting}[label={code:fundamentals/namespaces/network-example}, style=bash, caption={Commands for configuring the network as shown in  Figure (\ref{images:fundamentals/net-ns-veth-arch.jpg})}]
+$ ip netns add A 
+$ ip netns add B 
+$ ip link add veth-A-1 netns A type veth peer name veth-A-2
+$ ip link add veth-B-1 netns B type veth peer name veth-B-2
+$ ip netns exec A ip addr add "192.168.1.1/24" dev veth-A-1 
+$ ip netns exec B ip addr add "192.168.1.2/24" dev veth-B-1
+$ ip netns exec A ip link set veth-A-1 up 
+$ ip netns exec B ip link set veth-B-1 up 
+$ ip link set veth-A-2 up 
+$ ip link set veth-B-2 up 
+$ ip link add name br-AB-0 type bridge 
+$ ip link set br-AB-0 up 
+$ ip link set veth-A-2 master br-AB-0 
+$ ip link set veth-B-2 master br-AB-0 
+$ ip addr add 192.168.1.10/24 brd 192.168.1.255 dev br-AB-0
+\end{lstlisting}
+
+On lines 1-2, two network namespaces $A$ and $B$ are created. On line 3, a virtual ethernet 
+cable is created, whose ends are represented by \verb|veth-A-1| and \verb|veth-A-2|. The former 
+is injected into namespace $A$, whilst the latter is kept in the root namespace. 
+The same process is executed on line 4 for namespace $B$. The isolated ends of the 
+virtual devices are initialised and assigned unique IP addresses that are a part of the same logical network.
+The other ends are initialised as well. On lines 11-14 a bridge is created and the 
+virtual ethernet cables are attached to it. At this point, $A$ and $B$ can communicate 
+effectively with each other. The host, however, interprets the bridge solely as an L2 packet 
+forwarder that cannot interact with the other namespaces. On line 15, the bridge
+is made a participant of the isolated network by being assigned an IP address.
+Now, both namespaces and the host can communicate with each other. 
+However, a mechanism for routing traffic from the bridge to a different node in the 
+host network or the internet is missing. 
+
+\subsection{Interprocess Communication Namespace}
 \label{sections:fundamentals/namespaces/ipc}
 
 \subsection{UNIX Time-Sharing Namespace}
@@ -351,7 +416,7 @@ UNIX Time-Sharing (uts) namespaces encapsulate the system's host name and domain
 When creating a new uts namespace, the kernel simply copies the system identifiers of the 
 previous namespace and exposes the copied versions to all residents of the namespace. 
 The residents are free to change both identifiers without affecting the actual values 
-on the host. Example \ref{code:fundamentals/namespaces/user-example} already highlights 
+on the host. Example (\ref{code:fundamentals/namespaces/user-example}) already highlights 
 how to detach a shell into a new uts namespace and set its host name.
 
 \subsection{Control Group Namespace}

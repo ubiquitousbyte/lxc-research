@@ -11,5 +11,9 @@ add_executable(namespace-test namespace-test.cpp)
 target_link_libraries(namespace-test PRIVATE conty gtest_main)
 set_property(TARGET namespace-test PROPERTY TEST 1)
 
+add_executable(hook-test hook-test.cpp)
+target_link_libraries(hook-test PRIVATE conty gtest_main)
+
 include(GoogleTest)
 gtest_discover_tests(namespace-test)
+gtest_discover_tests(hook-test)

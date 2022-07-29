@@ -122,3 +122,13 @@ poll_err:
     close(pid_fd);
     return err;
 }
+
+int conty_event_hooks_init(struct conty_event_hooks *hooks)
+{
+    SLIST_INIT(&hooks->on_rt_create);
+    SLIST_INIT(&hooks->on_cont_created);
+    SLIST_INIT(&hooks->on_cont_start);
+    SLIST_INIT(&hooks->on_cont_started);
+    SLIST_INIT(&hooks->on_cont_stopped);
+    return 0;
+}

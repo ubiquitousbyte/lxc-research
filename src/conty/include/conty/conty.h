@@ -28,6 +28,16 @@ void conty_hook_put_env(struct conty_hook *hook, struct conty_hook_param *env);
 int conty_hook_put_timeout(struct conty_hook *hook, int timeout);
 int conty_hook_exec(struct conty_hook *hook, const char *buf, size_t buf_len);
 
+struct conty_event_hooks {
+    SLIST_HEAD(conty_on_rt_create_hooks, conty_hook)    on_rt_create;
+    SLIST_HEAD(conty_on_cont_created_hooks, conty_hook) on_cont_created;
+    SLIST_HEAD(conty_on_cont_start_hooks, conty_hook)   on_cont_start;
+    SLIST_HEAD(conty_on_cont_started_hooks, conty_hook) on_cont_started;
+    SLIST_HEAD(conty_on_cont_stopped_hooks, conty_hook) on_cont_stopped;
+};
+
+int conty_event_hooks_init(struct conty_event_hooks *hooks);
+
 #ifdef __cplusplus
 }; // extern "C"
 #endif

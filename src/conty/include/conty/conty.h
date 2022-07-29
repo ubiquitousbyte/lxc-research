@@ -19,7 +19,7 @@ struct conty_hook {
     SLIST_HEAD(conty_hook_env, conty_hook_param)  envp;
     size_t                                        args_count;
     size_t                                        env_count;
-    int                                           timeout;
+    int                                           timeout_ms;
 };
 
 int conty_hook_init(struct conty_hook *hook, const char *path);

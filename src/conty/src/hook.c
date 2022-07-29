@@ -8,14 +8,14 @@
 
 #include "syscall.h"
 
-#define CONTY_HOOK_TIMEOUT 4
+#define CONTY_HOOK_TIMEOUT 4000
 
 #define CONTY_HOOK_EXECVE_ARGS(hook_args, args, len) do { \
-    __typeof(len) ___len = len;                                                      \
-    args[___len] = NULL;                                \
-    struct conty_hook_param *item, *tmp;             \
+    __typeof(len) ___len = len;                           \
+    args[___len] = NULL;                                  \
+    struct conty_hook_param *item, *tmp;                  \
     SLIST_FOREACH_SAFE(item, hook_args, next, tmp)        \
-        argv[--___len] = item->param;                   \
+        argv[--___len] = item->param;                     \
 } while(0)
 
 int conty_hook_init(struct conty_hook *hook, const char *path)
@@ -25,7 +25,7 @@ int conty_hook_init(struct conty_hook *hook, const char *path)
     SLIST_INIT(&hook->envp);
     hook->args_count = 0;
     hook->env_count = 0;
-    hook->timeout = CONTY_HOOK_TIMEOUT;
+    hook->timeout_ms = CONTY_HOOK_TIMEOUT;
     return 0;
 }
 
@@ -45,7 +45,7 @@ int conty_hook_put_timeout(struct conty_hook *hook, int timeout)
 {
     if (timeout < 0)
         return -EINVAL;
-    hook->timeout = timeout;
+    hook->timeout_ms = timeout;
     return 0;
 }
 
@@ -56,8 +56,7 @@ int conty_hook_exec(struct conty_hook *hook, const char *buf, size_t buf_len)
     if (pipe(pipes) != 0)
         return -errno;
 
-    int reader = pipes[0];
-    int writer = pipes[1];
+    int reader = pipes[0], writer = pipes[1];
 
     pid_t child = fork();
     if (child < 0)
@@ -68,13 +67,12 @@ int conty_hook_exec(struct conty_hook *hook, const char *buf, size_t buf_len)
         if (dup2(reader, STDIN_FILENO) != STDIN_FILENO)
             exit(EXIT_FAILURE);
 
-        size_t args_count = hook->args_count + 1;
-        size_t env_count = hook->env_count + 1;
-        const char *argv[args_count];
-        const char *envp[env_count];
+        const char *argv[hook->args_count + 2];
+        argv[0] = hook->path;
+        CONTY_HOOK_EXECVE_ARGS(&hook->args, argv, hook->args_count + 1);
 
-        CONTY_HOOK_EXECVE_ARGS(&hook->args, argv, args_count);
-        CONTY_HOOK_EXECVE_ARGS(&hook->envp, envp, env_count);
+        const char *envp[hook->env_count + 1];
+        CONTY_HOOK_EXECVE_ARGS(&hook->envp, envp, hook->env_count);
 
         execve(hook->path, (char *const *) argv, (char *const *) envp);
         exit(EXIT_FAILURE);
@@ -99,8 +97,7 @@ int conty_hook_exec(struct conty_hook *hook, const char *buf, size_t buf_len)
             .events = POLLIN,
             .revents = 0
     };
-
-    err = poll(&pfd, 1, hook->timeout);
+    err = poll(&pfd, 1, hook->timeout_ms);
     if (err == -1)
         goto poll_err_errno;
     if (err == 0) {
@@ -111,6 +108,7 @@ int conty_hook_exec(struct conty_hook *hook, const char *buf, size_t buf_len)
     if (waitpid(child, NULL, 0) == -1)
         goto poll_err_errno;
 
+    close(pid_fd);
     return 0;
 
 pipe_err:

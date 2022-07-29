@@ -22,9 +22,12 @@ target_sources(conty
         ${CONTY_PRIVATE}/capability.h
         ${CONTY_PRIVATE}/capability.c
         ${CONTY_PRIVATE}/hook.c
+        ${CONTY_PRIVATE}/hook.h
+        ${CONTY_PRIVATE}/mount.h
+        ${CONTY_PRIVATE}/mount.c
         ${CONTY_PRIVATE}/syscall.h
+        ${CONTY_PRIVATE}/queue.h
     PUBLIC
-        ${CONTY_PUBLIC_HDR}/queue.h
         ${CONTY_PUBLIC_HDR}/conty.h)
 
 target_include_directories(conty

@@ -13,6 +13,7 @@ set_property(TARGET namespace-test PROPERTY TEST 1)
 
 add_executable(hook-test hook-test.cpp)
 target_link_libraries(hook-test PRIVATE conty gtest_main)
+set_property(TARGET hook-test PROPERTY TEST 1)
 
 include(GoogleTest)
 gtest_discover_tests(namespace-test)

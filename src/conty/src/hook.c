@@ -1,4 +1,4 @@
-#include <conty/conty.h>
+#include "hook.h"
 
 #include <errno.h>
 #include <stdlib.h>
@@ -129,7 +129,7 @@ int conty_hook_exec(struct conty_hook *hook, const char *buf,
             if (waitpid(child, status, 0) != child)
                 goto poll_err_errno;
             err = (!timeout && sig == SIGKILL) ? -ETIMEDOUT : 0;
-            break;
+            goto poll_out;
         }
 
         if (err == 0) {
@@ -145,9 +145,6 @@ int conty_hook_exec(struct conty_hook *hook, const char *buf,
         }
     }
 
-    close(pid_fd);
-    return err;
-
 pipe_err:
     err = -errno;
     close(reader);
@@ -156,6 +153,8 @@ pipe_err:
 
 poll_err_errno:
     err = -errno;
+
+poll_out:
     close(pid_fd);
     return err;
 }
@@ -163,9 +162,9 @@ poll_err_errno:
 int conty_event_hooks_init(struct conty_event_hooks *hooks)
 {
     SLIST_INIT(&hooks->on_rt_create);
-    SLIST_INIT(&hooks->on_cont_created);
-    SLIST_INIT(&hooks->on_cont_start);
-    SLIST_INIT(&hooks->on_cont_started);
-    SLIST_INIT(&hooks->on_cont_stopped);
+    SLIST_INIT(&hooks->on_sandbox_created);
+    SLIST_INIT(&hooks->on_sandbox_start);
+    SLIST_INIT(&hooks->on_sandbox_started);
+    SLIST_INIT(&hooks->on_sandbox_stopped);
     return 0;
 }

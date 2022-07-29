@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <conty/conty.h>
+#include "hook.h"
 #include <errno.h>
 
 #define CONTY_HOOK_EXECVE_ARGS(hook_args, args, len) do { \

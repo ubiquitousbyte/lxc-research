@@ -14,6 +14,7 @@
 
 TEST(conty_hook, conty_hook_exec_timeout)
 {
+    int status;
     struct conty_hook hook;
     conty_hook_init(&hook, "/usr/bin/sleep");
     struct conty_hook_param param1 = {
@@ -24,11 +25,12 @@ TEST(conty_hook, conty_hook_exec_timeout)
     memset(buf, 0, sizeof buf);
 
 
-    ASSERT_EQ(conty_hook_exec(&hook, buf, sizeof buf), -ETIMEDOUT);
+    ASSERT_EQ(conty_hook_exec(&hook, buf, sizeof buf, &status), -ETIMEDOUT);
 }
 
 TEST(conty_hook, conty_hook_exec)
 {
+    int status;
     struct conty_hook hook;
     conty_hook_init(&hook, "/usr/bin/sleep");
     struct conty_hook_param param1 = {
@@ -38,5 +40,5 @@ TEST(conty_hook, conty_hook_exec)
     char buf[64];
     memset(buf, 0, sizeof buf);
 
-    ASSERT_EQ(conty_hook_exec(&hook, buf, sizeof buf), 0);
+    ASSERT_EQ(conty_hook_exec(&hook, buf, sizeof buf, &status), 0);
 }

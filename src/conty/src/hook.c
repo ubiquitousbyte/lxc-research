@@ -49,7 +49,8 @@ int conty_hook_put_timeout(struct conty_hook *hook, int timeout)
     return 0;
 }
 
-int conty_hook_exec(struct conty_hook *hook, const char *buf, size_t buf_len)
+int conty_hook_exec(struct conty_hook *hook, const char *buf,
+                    size_t buf_len, int *status)
 {
     int err;
     int pipes[2];
@@ -63,31 +64,46 @@ int conty_hook_exec(struct conty_hook *hook, const char *buf, size_t buf_len)
         goto pipe_err;
 
     if (child == 0) {
+        /*
+         * The child will execute the hook.
+         * Before that, we redirect its standard input stream to the
+         * read end of the pipe where the parent will be dumping data
+         */
         close(writer);
         if (dup2(reader, STDIN_FILENO) != STDIN_FILENO)
             exit(EXIT_FAILURE);
 
+        /* 1 for the path, 1 for NULL plus everything added by put_arg */
         const char *argv[hook->args_count + 2];
         argv[0] = hook->path;
         CONTY_HOOK_EXECVE_ARGS(&hook->args, argv, hook->args_count + 1);
 
+        /* 1 for NULL plus everything added by put_env */
         const char *envp[hook->env_count + 1];
         CONTY_HOOK_EXECVE_ARGS(&hook->envp, envp, hook->env_count);
 
         execve(hook->path, (char *const *) argv, (char *const *) envp);
         exit(EXIT_FAILURE);
     }
+    /*
+     * Parent closes the reader as it won't be reading any data and writes
+     * the user-defined buffer into the pipe
+     */
     close(reader);
-
-    ssize_t tx;
-    do {
-        tx = write(writer, buf, buf_len);
-    } while (errno == EINTR);
+    ssize_t tx = write(writer, buf, buf_len);
     err = -errno;
     close(writer);
     if (tx == -1)
         return err;
 
+    /*
+     * This is where things get interesting.
+     * The child must not allow the runtime to stall because it takes too long
+     * to execute, that's why we have the timeout.
+     * The pidfd_open system call returns a pollable file descriptor referring
+     * to the child process, which we then pass into poll and wait
+     * for the child to complete with a timeout
+     */
     int pid_fd = conty_pidfd_open(child, 0);
     if (pid_fd < 0)
         return -errno;
@@ -97,28 +113,49 @@ int conty_hook_exec(struct conty_hook *hook, const char *buf, size_t buf_len)
             .events = POLLIN,
             .revents = 0
     };
-    err = poll(&pfd, 1, hook->timeout_ms);
-    if (err == -1)
-        goto poll_err_errno;
-    if (err == 0) {
-        err = -ETIMEDOUT;
-        goto poll_err;
+
+    int timeout = hook->timeout_ms;
+    int sig = SIGTERM;
+    for (;;) {
+        err = poll(&pfd, 1, timeout);
+        if (err == -1)
+            goto poll_err_errno;
+
+        if (err > 0) {
+            /*
+             * Child has terminated,
+             * so we release the process identifier from the kernel
+             */
+            if (waitpid(child, status, 0) != child)
+                goto poll_err_errno;
+            err = (!timeout && sig == SIGKILL) ? -ETIMEDOUT : 0;
+            break;
+        }
+
+        if (err == 0) {
+            /**
+             * Child hasn't exited in a timely fashion, so we'll
+             * try to terminate it gracefully first and if that
+             * fails we'll nail it to the ground via a SIGKILL
+             */
+             if (conty_pidfd_send_signal(pid_fd, sig, NULL, 0) != 0)
+                 goto poll_err_errno;
+             timeout = 0;
+             sig = SIGKILL;
+        }
     }
 
-    if (waitpid(child, NULL, 0) == -1)
-        goto poll_err_errno;
-
     close(pid_fd);
-    return 0;
+    return err;
 
 pipe_err:
     err = -errno;
     close(reader);
     close(writer);
     return err;
+
 poll_err_errno:
     err = -errno;
-poll_err:
     close(pid_fd);
     return err;
 }

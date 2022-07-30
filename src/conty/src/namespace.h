@@ -24,6 +24,8 @@ ino_t conty_ns_inode(const struct conty_ns *ns);
 
 dev_t conty_ns_device(const struct conty_ns *ns);
 
+int conty_ns_type(const struct conty_ns *ns);
+
 int conty_ns_is(const struct conty_ns *left, const struct conty_ns *right);
 
 int conty_ns_join(const struct conty_ns *ns);

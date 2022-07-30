@@ -1,8 +1,11 @@
-//
-// Created by nas on 29/07/22.
-//
-
 #ifndef CONTY_MOUNT_H
 #define CONTY_MOUNT_H
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#ifdef __cplusplus
+}; // extern "C"
+#endif
 
 #endif //CONTY_MOUNT_H

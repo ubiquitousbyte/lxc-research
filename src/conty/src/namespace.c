@@ -21,7 +21,7 @@ struct conty_ns {
     int           fd;
     /*
      * The inode number and the device identifier of the proc file uniquely
-     * identify the namespace
+     * identifying the namespace
      */
     ino_t         ino;
     dev_t         dev;
@@ -122,6 +122,11 @@ struct conty_ns *conty_ns_from_fd(int fd)
     return __conty_ns_from_fd(fd, ns_type);
 }
 
+int conty_ns_type(const struct conty_ns *ns)
+{
+    return ns->type;
+}
+
 int conty_ns_is(const struct conty_ns *left, const struct conty_ns *right)
 {
     return (left->ino == right->ino) && (left->dev == right->dev);
@@ -139,10 +144,7 @@ dev_t conty_ns_device(const struct conty_ns *ns)
 
 int conty_ns_join(const struct conty_ns *ns)
 {
-    if (setns(ns->fd, ns->type) != 0)
-        return -errno;
-
-    return 0;
+    return (setns(ns->fd, ns->type) != 0) ? -errno : 0;
 }
 
 int conty_ns_detach(int flags)
@@ -155,10 +157,7 @@ int conty_ns_detach(int flags)
                  CLONE_SETTLS | CLONE_CHILD_SETTID | CLONE_PARENT_SETTID))
         return -EINVAL;
 
-    if (unshare(flags) != 0)
-        return -errno;
-
-    return 0;
+    return (unshare(flags) != 0) ? -errno : 0;
 }
 
 struct conty_ns *conty_ns_parent(const struct conty_ns *ns)

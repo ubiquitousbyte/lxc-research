@@ -19,14 +19,15 @@ target_sources(conty
     PRIVATE
         ${CONTY_PRIVATE}/namespace.c
         ${CONTY_PRIVATE}/namespace.h
-        ${CONTY_PRIVATE}/capability.h
-        ${CONTY_PRIVATE}/capability.c
+        ${CONTY_PRIVATE}/helpers.h
         ${CONTY_PRIVATE}/hook.c
         ${CONTY_PRIVATE}/hook.h
         ${CONTY_PRIVATE}/mount.h
         ${CONTY_PRIVATE}/mount.c
         ${CONTY_PRIVATE}/syscall.h
         ${CONTY_PRIVATE}/queue.h
+        ${CONTY_PRIVATE}/rt.h
+        ${CONTY_PRIVATE}/rt.c
     PUBLIC
         ${CONTY_PUBLIC_HDR}/conty.h)
 

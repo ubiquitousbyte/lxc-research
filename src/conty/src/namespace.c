@@ -28,7 +28,7 @@ struct conty_ns {
     /*
      * The flag identifying the namespace type
      */
-    unsigned long type;
+    int           type;
 };
 
 /*

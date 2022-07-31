@@ -7,6 +7,7 @@
 #include <sys/wait.h>
 
 #include "syscall.h"
+#include "clone.h"
 
 #define CONTY_HOOK_TIMEOUT 4000
 
@@ -52,16 +53,16 @@ int conty_hook_put_timeout(struct conty_hook *hook, int timeout)
 int conty_hook_exec(struct conty_hook *hook, const char *buf,
                     size_t buf_len, int *status)
 {
-    int err;
+    int err, pid_fd = -EBADF;
     int pipes[2];
     if (pipe(pipes) != 0)
         return -errno;
 
     int reader = pipes[0], writer = pipes[1];
 
-    pid_t child = fork();
+    pid_t child = conty_clone(CLONE_PIDFD, &pid_fd);
     if (child < 0)
-        goto pipe_err;
+        goto clone_err;
 
     if (child == 0) {
         /*
@@ -95,18 +96,6 @@ int conty_hook_exec(struct conty_hook *hook, const char *buf,
     close(writer);
     if (tx == -1)
         return err;
-
-    /*
-     * This is where things get interesting.
-     * The child must not allow the runtime to stall because it takes too long
-     * to execute, that's why we have the timeout.
-     * The pidfd_open system call returns a pollable file descriptor referring
-     * to the child process, which we then pass into poll and wait
-     * for the child to complete with a timeout
-     */
-    int pid_fd = conty_pidfd_open(child, 0);
-    if (pid_fd < 0)
-        return -1;
 
     struct pollfd pfd = {
             .fd = pid_fd,
@@ -145,11 +134,10 @@ int conty_hook_exec(struct conty_hook *hook, const char *buf,
         }
     }
 
-pipe_err:
-    err = -errno;
+clone_err:
     close(reader);
     close(writer);
-    return err;
+    return child;
 
 poll_err_errno:
     err = -errno;

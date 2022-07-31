@@ -42,7 +42,7 @@ static int conty_sandbox_join_and_run(void *sb)
      */
     unsigned int flags = CLONE_PARENT | sandbox->ns.clone_flags;
     err = conty_clone_cb(conty_sandbox_run, sb, flags, &sandbox->pidfd);
-    
+
     return (err < 0) ? EXIT_FAILURE : 0;
 }
 
@@ -54,5 +54,4 @@ int conty_sandbox_create(struct conty_sandbox *sandbox)
         return -errno;
 
     return 0;
-
 }

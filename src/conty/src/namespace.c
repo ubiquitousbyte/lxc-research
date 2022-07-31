@@ -144,7 +144,7 @@ dev_t conty_ns_device(const struct conty_ns *ns)
 
 int conty_ns_join(const struct conty_ns *ns)
 {
-    return (setns(ns->fd, ns->type) != 0) ? -errno : 0;
+    return setns(ns->fd, ns->type);
 }
 
 int conty_ns_detach(int flags)
@@ -156,8 +156,7 @@ int conty_ns_detach(int flags)
     if (flags & (CLONE_FS | CLONE_FILES | CLONE_SYSVSEM | CLONE_VM |
                  CLONE_SETTLS | CLONE_CHILD_SETTID | CLONE_PARENT_SETTID))
         return -EINVAL;
-
-    return (unshare(flags) != 0) ? -errno : 0;
+    return unshare(flags);
 }
 
 struct conty_ns *conty_ns_parent(const struct conty_ns *ns)

@@ -22,8 +22,8 @@ struct conty_hook {
     const char                                   *path;
     SLIST_HEAD(conty_hook_argv, conty_hook_param) args;
     SLIST_HEAD(conty_hook_env, conty_hook_param)  envp;
-    size_t                                        args_count;
-    size_t                                        env_count;
+    size_t                                        argc;
+    size_t                                        envc;
     int                                           timeout_ms;
 };
 

@@ -10,9 +10,6 @@
 #ifndef ptr_to_u64
 #define ptr_to_u64(ptr) ((__u64)((uintptr_t)(ptr)))
 #endif
-#ifndef u64_to_ptr
-#define u64_to_ptr(x) ((void *)(uintptr_t)x)
-#endif
 
 pid_t conty_clone(unsigned long flags, int *pidfd);
 

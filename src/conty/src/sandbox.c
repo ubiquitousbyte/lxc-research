@@ -3,7 +3,6 @@
 #include <errno.h>
 #include <sys/socket.h>
 #include <sched.h>
-#include <stdlib.h>
 
 #include "clone.h"
 
@@ -30,28 +29,51 @@ static int conty_sandbox_join_and_run(void *sb)
 
         err = conty_ns_join(cur);
         if (err < 0)
-            return EXIT_FAILURE;
+            return -1;
     }
-
     /*
      * This is an intermediate process that simply sets up the
      * namespace environment. We want the parent of the sandbox to be
      * the runtime, not this intermediate process, so we set CLONE_PARENT
      * which makes sure that the sandbox will be attached as a sister
-     * to the intermediate process, rather than a child.
+     * to the intermediate process in the process hierarchy
      */
-    unsigned int flags = CLONE_PARENT | sandbox->ns.clone_flags;
-    err = conty_clone_cb(conty_sandbox_run, sb, flags, &sandbox->pidfd);
-
-    return (err < 0) ? EXIT_FAILURE : 0;
+    unsigned int flags = CLONE_PARENT | CLONE_PIDFD | sandbox->ns.clone_flags;
+    sandbox->pid = conty_clone_cb(conty_sandbox_run, sb, flags, &sandbox->pidfd);
+    return (sandbox->pid < 0) ? -1 : 0;
 }
 
 int conty_sandbox_create(struct conty_sandbox *sandbox)
 {
-    int err;
-    err = socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, sandbox->ipc_fds);
-    if (err != 0)
+    if (sandbox->ns.clone_flags & (CLONE_VM | CLONE_PARENT_SETTID |
+                                   CLONE_CHILD_SETTID | CLONE_CHILD_CLEARTID |
+                                   CLONE_SETTLS)) {
+        /*
+         * Caller must not be allowed to interfere with the runtime, which
+         * most definitely will happen if they're allowed to access
+         * its virtual memory pages or set up thread local storage
+         */
+        return -EINVAL;
+    }
+
+    /*
+     * Create inter-process communication channel between sandbox and runtime
+     */
+    if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, sandbox->ipc_fds) != 0)
         return -errno;
+
+    pid_t ns_pid;
+    /*
+     * Create a new hybrid process to set up the namespace environment and
+     * spawn the actual sandbox. To improve efficiency, the hybrid is allowed
+     * to share the parent's virtual memory pages and file descriptor table
+     */
+    ns_pid = conty_clone_cb(conty_sandbox_join_and_run, (void *) sandbox,
+                           CLONE_VM | CLONE_VFORK | CLONE_FILES, NULL);
+    if (ns_pid < 0)
+        return -EINVAL;
+
+
 
     return 0;
 }

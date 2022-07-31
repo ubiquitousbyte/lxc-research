@@ -7,10 +7,6 @@
 
 pid_t conty_clone(unsigned long flags, int *pidfd)
 {
-    if (flags & (CLONE_VM | CLONE_PARENT_SETTID | CLONE_CHILD_SETTID |
-                 CLONE_CHILD_CLEARTID | CLONE_SETTLS))
-        return -EINVAL;
-
     struct clone_args args = {
             .flags = flags,
             .pidfd = ptr_to_u64(pidfd),
@@ -31,8 +27,7 @@ pid_t conty_clone(unsigned long flags, int *pidfd)
      * legacy clone call, but that's extremely architecture-specific
      * and I simply don't have the know-how nor the energy to deal with that
      */
-    pid_t pid = conty_raw_clone3(&args, CLONE_ARGS_SIZE_VER0);
-    return (pid < 0) ? -errno : pid;
+    return conty_raw_clone3(&args, CLONE_ARGS_SIZE_VER0);
 }
 
 int conty_clone_cb(int (*fn)(void*), void *arg, unsigned int flags, int *pidfd)

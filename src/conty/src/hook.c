@@ -24,8 +24,8 @@ int conty_hook_init(struct conty_hook *hook, const char *path)
     hook->path = path;
     SLIST_INIT(&hook->args);
     SLIST_INIT(&hook->envp);
-    hook->args_count = 0;
-    hook->env_count = 0;
+    hook->argc = 0;
+    hook->envc = 0;
     hook->timeout_ms = CONTY_HOOK_TIMEOUT;
     return 0;
 }
@@ -33,13 +33,13 @@ int conty_hook_init(struct conty_hook *hook, const char *path)
 void conty_hook_put_arg(struct conty_hook *hook, struct conty_hook_param *arg)
 {
     SLIST_INSERT_HEAD(&hook->args, arg, next);
-    ++hook->args_count;
+    ++hook->argc;
 }
 
 void conty_hook_put_env(struct conty_hook *hook, struct conty_hook_param *env)
 {
     SLIST_INSERT_HEAD(&hook->envp, env, next);
-    ++hook->env_count;
+    ++hook->envc;
 }
 
 int conty_hook_put_timeout(struct conty_hook *hook, int timeout)
@@ -53,6 +53,7 @@ int conty_hook_put_timeout(struct conty_hook *hook, int timeout)
 int conty_hook_exec(struct conty_hook *hook, const char *buf,
                     size_t buf_len, int *status)
 {
+
     int err, pid_fd = -EBADF;
     int pipes[2];
     if (pipe(pipes) != 0)
@@ -61,8 +62,12 @@ int conty_hook_exec(struct conty_hook *hook, const char *buf,
     int reader = pipes[0], writer = pipes[1];
 
     pid_t child = conty_clone(CLONE_PIDFD, &pid_fd);
-    if (child < 0)
-        goto clone_err;
+    if (child < 0) {
+        err = -errno;
+        close(reader);
+        close(writer);
+        return err;
+    }
 
     if (child == 0) {
         /*
@@ -75,17 +80,18 @@ int conty_hook_exec(struct conty_hook *hook, const char *buf,
             exit(EXIT_FAILURE);
 
         /* 1 for the path, 1 for NULL plus everything added by put_arg */
-        const char *argv[hook->args_count + 2];
+        const char *argv[hook->argc + 2];
         argv[0] = hook->path;
-        CONTY_HOOK_EXECVE_ARGS(&hook->args, argv, hook->args_count + 1);
+        CONTY_HOOK_EXECVE_ARGS(&hook->args, argv, hook->argc + 1);
 
         /* 1 for NULL plus everything added by put_env */
-        const char *envp[hook->env_count + 1];
-        CONTY_HOOK_EXECVE_ARGS(&hook->envp, envp, hook->env_count);
+        const char *envp[hook->envc + 1];
+        CONTY_HOOK_EXECVE_ARGS(&hook->envp, envp, hook->envc);
 
         execve(hook->path, (char *const *) argv, (char *const *) envp);
         exit(EXIT_FAILURE);
     }
+
     /*
      * Parent closes the reader as it won't be reading any data and writes
      * the user-defined buffer into the pipe
@@ -95,7 +101,7 @@ int conty_hook_exec(struct conty_hook *hook, const char *buf,
     err = -errno;
     close(writer);
     if (tx == -1)
-        return err;
+        goto pidfd_out;
 
     struct pollfd pfd = {
             .fd = pid_fd,
@@ -105,44 +111,43 @@ int conty_hook_exec(struct conty_hook *hook, const char *buf,
 
     int timeout = hook->timeout_ms;
     int sig = SIGTERM;
+    int poll_res;
     for (;;) {
-        err = poll(&pfd, 1, timeout);
-        if (err == -1)
-            goto poll_err_errno;
+        poll_res = poll(&pfd, 1, timeout);
+        if (poll_res == -1)
+            goto pidfd_err;
 
-        if (err > 0) {
-            /*
-             * Child has terminated,
-             * so we release the process identifier from the kernel
-             */
-            if (waitpid(child, status, 0) != child)
-                goto poll_err_errno;
-            err = (!timeout && sig == SIGKILL) ? -ETIMEDOUT : 0;
-            goto poll_out;
-        }
-
-        if (err == 0) {
+        if (poll_res == 0) {
             /**
              * Child hasn't exited in a timely fashion, so we'll
              * try to terminate it gracefully first and if that
              * fails we'll nail it to the ground via a SIGKILL
              */
-             if (conty_pidfd_send_signal(pid_fd, sig, NULL, 0) != 0)
-                 goto poll_err_errno;
-             timeout = 0;
-             sig = SIGKILL;
+            if (conty_pidfd_send_signal(pid_fd, sig, NULL, 0) != 0)
+                goto pidfd_err;
+
+            timeout = 0;
+            sig = SIGKILL;
+        }
+
+        if (poll_res > 0) {
+            /*
+             * Child has terminated,
+             * so we release the process identifier from the kernel
+             */
+            if (waitpid(child, status, 0) != child)
+                goto pidfd_err;
+
+            if (sig == SIGKILL)
+                err = -ETIMEDOUT;
+
+            goto pidfd_out;
         }
     }
 
-clone_err:
-    close(reader);
-    close(writer);
-    return child;
-
-poll_err_errno:
+pidfd_err:
     err = -errno;
-
-poll_out:
+pidfd_out:
     close(pid_fd);
     return err;
 }

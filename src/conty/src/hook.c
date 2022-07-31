@@ -15,7 +15,7 @@
     args[___len] = NULL;                                  \
     struct conty_hook_param *item, *tmp;                  \
     SLIST_FOREACH_SAFE(item, hook_args, next, tmp)        \
-        argv[--___len] = item->param;                     \
+        args[--___len] = item->param;                     \
 } while(0)
 
 int conty_hook_init(struct conty_hook *hook, const char *path)
@@ -106,7 +106,7 @@ int conty_hook_exec(struct conty_hook *hook, const char *buf,
      */
     int pid_fd = conty_pidfd_open(child, 0);
     if (pid_fd < 0)
-        return -errno;
+        return -1;
 
     struct pollfd pfd = {
             .fd = pid_fd,

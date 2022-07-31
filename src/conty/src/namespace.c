@@ -1,5 +1,3 @@
-#define _GNU_SOURCE
-
 #include "namespace.h"
 
 #include <unistd.h>
@@ -11,6 +9,8 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <linux/nsfs.h>
+
+#include "syscall.h"
 
 struct conty_ns {
     /*
@@ -111,7 +111,7 @@ struct conty_ns *conty_ns_open(pid_t pid, int type)
 
 struct conty_ns *conty_ns_open_current(int type)
 {
-    return conty_ns_open(getpid(), type);
+    return conty_ns_open(conty_getpid(), type);
 }
 
 struct conty_ns *conty_ns_from_fd(int fd)

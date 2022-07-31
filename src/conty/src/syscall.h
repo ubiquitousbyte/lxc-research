@@ -1,3 +1,6 @@
+/*
+ * Welcome to portability hell and flexibility heaven
+ */
 #ifndef CONTY_SYSCALL_H
 #define CONTY_SYSCALL_H
 
@@ -6,8 +9,10 @@ extern "C" {
 #endif
 
 #include <signal.h>
-#include <sys/syscall.h>
 #include <unistd.h>
+#include <sched.h>
+#include <sys/syscall.h>
+#include <linux/sched.h>
 
 static inline int conty_pidfd_open(pid_t pid, unsigned int flags)
 {
@@ -57,6 +62,21 @@ static inline int conty_move_mount(int from_dfd, const char *from_pathname,
 static inline int conty_pivot_root(const char *new_root, const char *put_old)
 {
     return syscall(SYS_pivot_root, new_root, put_old);
+}
+
+static inline pid_t conty_raw_clone3(struct clone_args *cl_args, size_t size)
+{
+    return (pid_t) syscall(SYS_clone3, cl_args, size);
+}
+
+/*
+ * Used because glibc caches pids internally. That breaks getpid() within
+ * a child execution context created with the raw clone system call which
+ * bypasses glibc ... pls shoot me
+ */
+static inline pid_t conty_getpid(void)
+{
+    return (pid_t) syscall(SYS_getpid);
 }
 
 #ifdef __cplusplus

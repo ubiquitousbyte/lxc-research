@@ -5,6 +5,9 @@ project(conty
     LANGUAGES C CXX)
 
 set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS ON)
+string(APPEND CMAKE_C_FLAGS "-D_GNU_SOURCE")
 add_compile_definitions($<$<CONFIG:DEBUG>:CONTY_DEBUG>)
 
 # Dependencies
@@ -19,15 +22,16 @@ target_sources(conty
     PRIVATE
         ${CONTY_PRIVATE}/namespace.c
         ${CONTY_PRIVATE}/namespace.h
-        ${CONTY_PRIVATE}/helpers.h
         ${CONTY_PRIVATE}/hook.c
         ${CONTY_PRIVATE}/hook.h
         ${CONTY_PRIVATE}/mount.h
         ${CONTY_PRIVATE}/mount.c
         ${CONTY_PRIVATE}/syscall.h
         ${CONTY_PRIVATE}/queue.h
-        ${CONTY_PRIVATE}/rt.h
-        ${CONTY_PRIVATE}/rt.c
+        ${CONTY_PRIVATE}/sandbox.h
+        ${CONTY_PRIVATE}/sandbox.c
+        ${CONTY_PRIVATE}/clone.h
+        ${CONTY_PRIVATE}/clone.c
     PUBLIC
         ${CONTY_PUBLIC_HDR}/conty.h)
 

@@ -7,12 +7,11 @@ extern "C" {
 
 #include <stddef.h>
 #include <stdint.h>
+#include <unistd.h>
 
 #include <sys/types.h>
 
-#include <unistd.h>
-
-struct conty_ns;
+#include "queue.h"
 
 struct conty_ns *conty_ns_open(pid_t pid, int type);
 

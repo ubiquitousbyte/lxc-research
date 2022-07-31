@@ -15,6 +15,10 @@ add_executable(hook-test hook-test.cpp)
 target_link_libraries(hook-test PRIVATE conty gtest_main)
 set_property(TARGET hook-test PROPERTY TEST 1)
 
+add_executable(sandbox-test sandbox-test.c)
+target_link_libraries(sandbox-test PRIVATE conty)
+set_property(TARGET sandbox-test PROPERTY TEST 1)
+
 include(GoogleTest)
 gtest_discover_tests(namespace-test)
 gtest_discover_tests(hook-test)

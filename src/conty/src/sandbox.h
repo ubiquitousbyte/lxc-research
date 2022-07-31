@@ -21,10 +21,14 @@ typedef enum conty_sandbox_ns_idx_t {
 struct conty_sandbox {
     struct {
         /*
+         *
+         */
+        unsigned long all_clone_flags;
+        /*
          * Subset of the entire set that refers to namespaces that need
          * to be created
          */
-        unsigned int clone_flags;
+        unsigned long new_clone_flags;
         /*
          * Subset of the entire set that refers to namespaces that already
          * exist and need to be joined

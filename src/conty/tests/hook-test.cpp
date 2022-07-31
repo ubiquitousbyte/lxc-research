@@ -3,16 +3,7 @@
 #include "hook.h"
 #include <errno.h>
 
-#define CONTY_HOOK_EXECVE_ARGS(hook_args, args, len) do { \
-    __typeof(len) ___len = len;                            \
-    args[___len] = NULL;                                        \
-    struct conty_hook_param *item, *tmp;             \
-    SLIST_FOREACH_SAFE(item, hook_args, next, tmp)        \
-        argv[--___len] = item->param;                   \
-} while(0)
-
-
-TEST(conty_hook, conty_hook_exec_timeout)
+TEST(conty_hook, exec_timeout)
 {
     int status;
     struct conty_hook hook;
@@ -28,7 +19,7 @@ TEST(conty_hook, conty_hook_exec_timeout)
     ASSERT_EQ(conty_hook_exec(&hook, buf, sizeof buf, &status), -ETIMEDOUT);
 }
 
-TEST(conty_hook, conty_hook_exec)
+TEST(conty_hook, exec)
 {
     int status;
     struct conty_hook hook;

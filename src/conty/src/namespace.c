@@ -28,7 +28,7 @@ struct conty_ns {
     /*
      * The flag identifying the namespace type
      */
-    int           type;
+    unsigned long type;
 };
 
 /*
@@ -147,16 +147,16 @@ int conty_ns_join(const struct conty_ns *ns)
     return setns(ns->fd, ns->type);
 }
 
-int conty_ns_detach(int flags)
+int conty_ns_detach(int namespaces)
 {
     /*
      * Any bits in the mask unrelated to namespace configuration
      * effectively render the operation invalid
      */
-    if (flags & (CLONE_FS | CLONE_FILES | CLONE_SYSVSEM | CLONE_VM |
-                 CLONE_SETTLS | CLONE_CHILD_SETTID | CLONE_PARENT_SETTID))
+    if (namespaces & (CLONE_FS | CLONE_FILES | CLONE_SYSVSEM | CLONE_VM |
+                      CLONE_SETTLS | CLONE_CHILD_SETTID | CLONE_PARENT_SETTID))
         return -EINVAL;
-    return unshare(flags);
+    return unshare(namespaces);
 }
 
 struct conty_ns *conty_ns_parent(const struct conty_ns *ns)

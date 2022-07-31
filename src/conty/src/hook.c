@@ -61,7 +61,7 @@ int conty_hook_exec(struct conty_hook *hook, const char *buf,
 
     int reader = pipes[0], writer = pipes[1];
 
-    pid_t child = conty_clone(CLONE_PIDFD, &pid_fd);
+    pid_t child = conty_clone3(CLONE_PIDFD, &pid_fd, NULL, 0);
     if (child < 0) {
         err = -errno;
         close(reader);

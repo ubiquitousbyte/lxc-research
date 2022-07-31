@@ -1,9 +1,13 @@
 #include <gtest/gtest.h>
 
 #include "namespace.h"
+#include "syscall.h"
 
+#include <linux/mount.h>
 #include <unistd.h>
 #include <errno.h>
+#include <string.h>
+#include <fcntl.h>
 
 TEST(conty_ns, open_invalid_id)
 {
@@ -135,4 +139,26 @@ TEST(conty_ns_id_map, put)
     EXPECT_EQ(rc, 0);
 
     EXPECT_EQ(map.written, strlen("0 100 5\n"));
+}
+
+TEST(conty_ns_mount, mount)
+{
+    conty_ns_detach(CLONE_NEWUSER | CLONE_NEWNS);
+    int map_fd = open("/proc/self/uid_map", O_WRONLY);
+    EXPECT_GT(map_fd, 0);
+
+    const char *buf = "0 1000 1";
+    EXPECT_GT(write(map_fd, buf, sizeof("0 1000 1")), 0);
+    close(map_fd);
+
+    printf("ID: %d\n", geteuid());
+
+    int fd = conty_fsopen("ext4", FSOPEN_CLOEXEC);
+    EXPECT_GT(fd, 0);
+
+    EXPECT_EQ(conty_fsconfig(fd, FSCONFIG_SET_FLAG, "acl", NULL, 0), 0);
+    EXPECT_EQ(conty_fsconfig(fd, FSCONFIG_SET_FLAG, "user_attr", NULL, 0), 0);
+    EXPECT_EQ(conty_fsconfig(fd, FSCONFIG_SET_STRING, "source", "/dev/loop0", 0), 0);
+    EXPECT_EQ(conty_fsconfig(fd, FSCONFIG_CMD_CREATE, NULL, NULL, 0), 0);
+    printf("%s\n", strerror(errno));
 }

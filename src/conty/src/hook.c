@@ -50,8 +50,7 @@ int conty_hook_put_timeout(struct conty_hook *hook, int timeout)
     return 0;
 }
 
-int conty_hook_exec(struct conty_hook *hook, const char *buf,
-                    size_t buf_len, int *status)
+int conty_hook_exec(struct conty_hook *hook, const char *buf, size_t buf_len)
 {
 
     int err, pid_fd = -EBADF;
@@ -111,7 +110,7 @@ int conty_hook_exec(struct conty_hook *hook, const char *buf,
 
     int timeout = hook->timeout_ms;
     int sig = SIGTERM;
-    int poll_res;
+    int poll_res, status;
     for (;;) {
         poll_res = poll(&pfd, 1, timeout);
         if (poll_res == -1)
@@ -135,11 +134,18 @@ int conty_hook_exec(struct conty_hook *hook, const char *buf,
              * Child has terminated,
              * so we release the process identifier from the kernel
              */
-            if (waitpid(child, status, 0) != child)
+            if (waitpid(child, &status, 0) != child)
                 goto pidfd_err;
 
-            if (sig == SIGKILL)
-                err = -ETIMEDOUT;
+            if (WIFSIGNALED(status)) {
+                if (WTERMSIG(status) == SIGKILL || WTERMSIG(status) == SIGTERM)
+                    err = -ETIMEDOUT;
+                else
+                    err = -EINTR;
+            }
+
+            if (WIFEXITED(status) && WEXITSTATUS(status) != 0)
+                err = -1;
 
             goto pidfd_out;
         }

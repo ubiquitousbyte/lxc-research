@@ -31,8 +31,7 @@ int conty_hook_init(struct conty_hook *hook, const char *path);
 void conty_hook_put_arg(struct conty_hook *hook, struct conty_hook_param *arg);
 void conty_hook_put_env(struct conty_hook *hook, struct conty_hook_param *env);
 int conty_hook_put_timeout(struct conty_hook *hook, int timeout);
-int conty_hook_exec(struct conty_hook *hook, const char *buf,
-                    size_t buf_len, int *status);
+int conty_hook_exec(struct conty_hook *hook, const char *buf, size_t buf_len);
 
 struct conty_event_hooks {
     SLIST_HEAD(conty_on_rt_create_hooks, conty_hook)       on_rt_create;

@@ -7,48 +7,46 @@ extern "C" {
 
 #include "namespace.h"
 #include "hook.h"
-
-typedef enum conty_sandbox_ns_idx_t {
-    CONTY_SANDBOX_NS_USER = 0,
-    CONTY_SANDBOX_NS_PID  = 1,
-    CONTY_SANDBOX_NS_MNT  = 2,
-    CONTY_SANDBOX_NS_NET  = 3,
-    CONTY_SANDBOX_NS_UTS  = 4,
-    CONTY_SANDBOX_NS_IPC  = 5,
-    CONTY_SANDBOX_NS_MAX  = 6,
-} conty_sandbox_ns_idx_t;
+#include "user.h"
+#include "queue.h"
 
 struct conty_sandbox {
     struct {
         /*
-         *
+         * Namespaces to create
          */
-        unsigned long all_clone_flags;
+        unsigned long new;
         /*
-         * Subset of the entire set that refers to namespaces that need
-         * to be created
+         * Namespaces to join
          */
-        unsigned long new_clone_flags;
+        unsigned long old;
         /*
-         * Subset of the entire set that refers to namespaces that already
-         * exist and need to be joined
+         * File descriptors of joined namespaces
+         * Initially, this contains the file descriptors
+         * of namespaces defined in old
          */
-        struct conty_ns *namespaces[CONTY_SANDBOX_NS_MAX];
-    } ns;
+        int           fds[CONTY_NS_SIZE];
+    };
+
     /*
-     * Event hooks to be triggered at different points during
-     * the sandboxing procedure
+     * Event hooks to trigger at different points of the sandboxing procedure
      */
-    struct conty_event_hooks hooks;
+    struct {
+        TAILQ_HEAD(__conty_rt_hooks, conty_hook)      on_rt_create;
+        TAILQ_HEAD(__conty_created_hooks, conty_hook) on_sb_created;
+        TAILQ_HEAD(__conty_start_hooks, conty_hook)   on_sb_start;
+        TAILQ_HEAD(__conty_started_hooks, conty_hook) on_sb_started;
+        TAILQ_HEAD(__conty_stopped_hooks, conty_hook) on_sb_stopped;
+    } hooks;
+
     /*
      * Identifier mappings between the parent user namespace and the
      * sandbox user namespace.
-     * Only valid when ns->all has CLONE_NEWUSER
      */
     struct {
-        struct conty_ns_id_map users;
-        struct conty_ns_id_map groups;
-    } *id_map;
+        struct conty_user_id_map *users;
+        struct conty_user_id_map *groups;
+    } id_map;
     /*
      * Socket file descriptors used for inter-process communication
      * between the sandbox and the runtime

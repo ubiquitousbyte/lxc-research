@@ -7,49 +7,53 @@ extern "C" {
 
 #include <stddef.h>
 #include <stdint.h>
-#include <unistd.h>
 
+#include <unistd.h>
+#include <sched.h>
 #include <sys/types.h>
 
-#include "queue.h"
+typedef enum conty_ns_t {
+    CONTY_NS_USER = 0,
+    CONTY_NS_PID  = 1,
+    CONTY_NS_MNT  = 2,
+    CONTY_NS_NET  = 3,
+    CONTY_NS_UTS  = 4,
+    CONTY_NS_IPC  = 5,
+} conty_ns_t ;
 
-struct conty_ns *conty_ns_open(pid_t pid, int type);
+#define CONTY_NS_SIZE (CONTY_NS_IPC + 1)
 
-struct conty_ns *conty_ns_open_current(int type);
+#define CONTY_NS_STRLEN (sizeof("cgroup"))
 
-struct conty_ns *conty_ns_from_fd(int fd);
-
-ino_t conty_ns_inode(const struct conty_ns *ns);
-
-dev_t conty_ns_device(const struct conty_ns *ns);
-
-int conty_ns_type(const struct conty_ns *ns);
-
-int conty_ns_is(const struct conty_ns *left, const struct conty_ns *right);
-
-int conty_ns_join(const struct conty_ns *ns);
-
-int conty_ns_detach(int namespaces);
-
-struct conty_ns *conty_ns_parent(const struct conty_ns *ns);
-
-void conty_ns_close(struct conty_ns *ns);
-
-/*
- * Max number of bytes to write to /proc/[pid]/uid_map
- */
-#define CONTY_NS_ID_MAP_MAX (sysconf(_SC_PAGESIZE))
-
-struct conty_ns_id_map {
-    char  *buf;
-    size_t cap;
-    size_t written;
+static const char *conty_ns_names[CONTY_NS_STRLEN] = {
+        [CONTY_NS_USER] = "user",
+        [CONTY_NS_PID]  = "pid",
+        [CONTY_NS_MNT]  = "mnt",
+        [CONTY_NS_NET]  = "net",
+        [CONTY_NS_UTS]  = "uts",
+        [CONTY_NS_IPC]  = "ipc",
 };
 
-int conty_ns_id_map_init(struct conty_ns_id_map *m, char *buf, size_t buf_size);
+static const int conty_ns_flags[CONTY_NS_SIZE] = {
+        [CONTY_NS_USER] = CLONE_NEWUSER,
+        [CONTY_NS_PID]  = CLONE_NEWPID,
+        [CONTY_NS_MNT]  = CLONE_NEWNS,
+        [CONTY_NS_NET]  = CLONE_NEWNET,
+        [CONTY_NS_UTS]  = CLONE_NEWUTS,
+        [CONTY_NS_IPC]  = CLONE_NEWIPC,
+};
 
-int conty_ns_id_map_put(struct conty_ns_id_map *m, unsigned left,
-                        unsigned right, unsigned range);
+int conty_ns_open(conty_ns_t ns, pid_t pid);
+
+static inline int conty_ns_open_current(conty_ns_t ns)
+{
+    return conty_ns_open(ns, getpid());
+}
+
+int conty_ns_unshare(int flags);
+int conty_ns_set(int fd, int type);
+
+int conty_ns_parent(int fd);
 
 #ifdef __cplusplus
 }; // extern "C"

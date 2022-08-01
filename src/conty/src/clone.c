@@ -1,48 +1,47 @@
 #include "clone.h"
 
-#include <errno.h>
+#include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
+#include <sys/signal.h>
+#include <sched.h>
+#include <linux/types.h>
 
+#include "resource.h"
 #include "syscall.h"
 
-pid_t conty_clone3(unsigned long flags, int *pidfd, void *stack, size_t stack_size)
+#define __CONTY_STACK_SIZE (8 * 1024 * 1024)
+pid_t conty_clone(int (*fn)(void *), void *arg, int flags, int *pidfd)
+{
+    __CONTY_FREE void *stack = NULL;
+
+    stack = malloc(__CONTY_STACK_SIZE);
+    if (!stack)
+        return -ENOMEM;
+
+    return clone(fn, stack + __CONTY_STACK_SIZE, flags | SIGCHLD, arg, pidfd);
+}
+
+pid_t conty_clone3(unsigned long flags, int *pidfd)
 {
     struct clone_args args = {
             .flags = flags,
-            .pidfd = ptr_to_u64(pidfd),
+            .pidfd = (__u64)(uintptr_t)pidfd
     };
 
-    /*
-     * In clone, we always need to specify the exit signal the parent
-     * should intercept when calling waitpid.
-     * But if the child will be reaped by the caller's parent, instead of
-     * the caller, then it will inherit its parent's exit signal
-     * so clone3 fails if we try and set it. Hence, we need to check
-     * and only then set it
-     * See https://elixir.bootlin.com/linux/latest/source/kernel/fork.c#L2895
-     */
     if (!(flags & CLONE_PARENT))
         args.exit_signal = SIGCHLD;
 
-    if (stack) {
-        args.stack = ptr_to_u64(stack);
-        args.stack_size = stack_size;
-    }
-
-    /*
-     * We use clone3 exclusively, We could technically fallback to the
-     * legacy clone call, but that's extremely architecture-specific
-     * and I simply don't have the know-how nor the energy to deal with that
-     */
-    return conty_raw_clone3(&args, CLONE_ARGS_SIZE_VER2);
+    return conty_clone3_raw(&args, CLONE_ARGS_SIZE_VER2);
 }
 
-int conty_clone3_cb(int (*fn)(void*), void *arg, unsigned long flags, int *pidfd,
-                    void* stack, size_t stack_size)
+pid_t conty_clone3_cb(int (*fn)(void*), void *arg,
+                      unsigned long flags, int *pidfd)
 {
-    pid_t child = conty_clone3(flags, pidfd, stack, stack_size);
+    pid_t child;
+
+    child = conty_clone3(flags, pidfd);
     if (child == 0)
         _exit(fn(arg));
+
     return child;
 }

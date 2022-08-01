@@ -4,6 +4,7 @@
 #include <sys/wait.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <string.h>
 
 #include "clone.h"
 #include "user.h"
@@ -49,10 +50,35 @@ static int conty_sandbox_write_mappings(const struct conty_sandbox *sandbox)
  */
 int __conty_sandbox_run(void *sb)
 {
-    getpid();
-    for (;;) {
+    int err;
+    struct conty_sandbox *sandbox = (struct conty_sandbox *) sb;
+    struct conty_hook *cur, *tmp;
 
+    if (sandbox->new & CLONE_NEWUSER) {
+        /*
+         * Configure identifier mappings between the parent
+         * user namespace and that of the sandbox.
+         */
+        if (conty_sandbox_write_mappings(sandbox) != 0)
+            return -1;
     }
+
+    if (sandbox->new & CLONE_NEWUTS) {
+        /*
+         * Configure new hostname
+         */
+        if (sethostname(sandbox->hostname, strlen(sandbox->hostname)) != 0)
+            return -1;
+    }
+
+    /*
+     * Run start hooks before executing the actual program
+     */
+    TAILQ_FOREACH_SAFE(cur, &sandbox->hooks.on_sb_start, next, tmp) {
+        if (conty_hook_exec(cur, NULL, 0, 0) != 0)
+            return -1;
+    }
+
     return 0;
 }
 
@@ -87,8 +113,15 @@ int __conty_sandbox_setup(void *sb)
     return (sandbox->pid < 0) ? -1: 0;
 }
 
-int conty_sandbox_create(struct conty_sandbox *sandbox)
+int conty_sandbox_start(struct conty_sandbox *sandbox)
 {
+    /*
+     * First, we'll create a connected socket pair to be used by the
+     * runtime and the sandbox for communication
+     */
+    if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, sandbox->ipc_fds) != 0)
+        return -1;
+
     if (conty_sandbox_join_existing(sandbox)) {
         /*
          * The sandbox needs to join an already existing set of namespaces
@@ -132,16 +165,6 @@ int conty_sandbox_create(struct conty_sandbox *sandbox)
         sandbox->pid = conty_clone3_cb(__conty_sandbox_run, sandbox,
                                        sandbox->new, &sandbox->pidfd);
         if (sandbox->pid < 0)
-            return -1;
-    }
-
-    if (sandbox->new & CLONE_NEWUSER) {
-        /*
-         * The caller has requested the creation of a new user namespace
-         * so we need to configure identifier mappings between the parent
-         * user namespace and that of the sandbox.
-         */
-        if (conty_sandbox_write_mappings(sandbox) != 0)
             return -1;
     }
 

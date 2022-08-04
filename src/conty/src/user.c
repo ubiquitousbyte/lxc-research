@@ -35,14 +35,10 @@ int conty_user_id_map_put(struct conty_user_id_map *m, unsigned left,
     return 0;
 }
 
-static int __conty_user_write_mappings(pid_t pid,
-                                       const char *map_name,
-                                       const struct conty_user_id_map *map)
+int __conty_user_write_mappings(const struct conty_user_id_map *map,
+                                const char *path)
 {
     __CONTY_CLOSE int mfd = -EBADF;
-    char path[sizeof("/proc/xxxxxxxxxxxxxxxxxxx/uid_map")];
-
-    sprintf(path, "/proc/%d/%s", pid, map_name);
 
     mfd = open(path, O_WRONLY | O_CLOEXEC);
     if (mfd < 0)
@@ -54,22 +50,9 @@ static int __conty_user_write_mappings(pid_t pid,
     return 0;
 }
 
-int conty_user_write_uid_mappings(pid_t pid, const struct conty_user_id_map *map)
-{
-    return __conty_user_write_mappings(pid, "uid_map", map);
-}
-
-int conty_user_write_gid_mappings(pid_t pid, const struct conty_user_id_map *map)
-{
-    return __conty_user_write_mappings(pid, "gid_map", map);
-}
-
-int conty_user_disable_setgroups(pid_t pid)
+int __conty_user_disable_setgroups(const char *path)
 {
     __CONTY_CLOSE int gfd = -EBADF;
-    char path[sizeof("/proc/xxxxxxxxxxxxxxxxxxx/setgroups")];
-
-    sprintf(path, "/proc/%d/setgroups", pid);
 
     gfd = open(path, O_WRONLY | O_CLOEXEC);
     if (gfd < 0)

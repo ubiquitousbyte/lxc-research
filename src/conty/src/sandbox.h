@@ -18,17 +18,12 @@ struct conty_sandbox {
          */
         unsigned long ns_new;
         /*
-         * Namespaces to join
-         */
-        unsigned long ns_old;
-        /*
          * File descriptors of joined namespaces
          * Initially, this contains the file descriptors
          * of namespaces defined in ns_old
          */
         int           ns_fds[CONTY_NS_SIZE];
     };
-
     /*
      * Event hooks to trigger at different points of the sandboxing procedure
      */
@@ -39,7 +34,6 @@ struct conty_sandbox {
         TAILQ_HEAD(__conty_started_hooks, conty_hook) on_sb_started;
         TAILQ_HEAD(__conty_stopped_hooks, conty_hook) on_sb_stopped;
     } hooks;
-
     /*
      * Identifier mappings between the parent user namespace and the
      * sandbox user namespace.
@@ -64,13 +58,14 @@ struct conty_sandbox {
     /*
      * Sandbox host name
      */
-    const char hostname[255];
+    char hostname[255];
     /*
      * Sandbox root filesystem
      */
     struct conty_rootfs rootfs;
-
 };
+
+struct conty_sandbox *conty_sandbox_create(const char *bundle);
 
 int conty_sandbox_start(struct conty_sandbox *sandbox);
 

@@ -12,6 +12,7 @@
 #include "user.h"
 #include "syscall.h"
 #include "mount.h"
+#include "log.h"
 
 static int conty_sandbox_join_existing(const struct conty_sandbox *sandbox)
 {
@@ -25,19 +26,21 @@ static int conty_sandbox_join_existing(const struct conty_sandbox *sandbox)
 static int conty_sandbox_write_mappings(const struct conty_sandbox *sandbox)
 {
     int err = 0;
+
     if (sandbox->id_map.users) {
-        err = conty_user_write_uid_mappings(sandbox->pid, sandbox->id_map.users);
+        err = conty_user_write_own_uid_mappings(sandbox->id_map.users);
         if (err != 0)
-            return -1;
+            return LOG_ERROR_RET(err, "sandbox: cannot write uid mappings");
     }
 
     if (sandbox->id_map.groups) {
-        err = conty_user_disable_setgroups(sandbox->pid);
+        err = conty_user_disable_own_setgroups();
         if (err != 0)
-            return -1;
+            LOG_WARN("sandbox: cannot disable setgroups cap");
 
-        err = conty_user_write_gid_mappings(sandbox->pid,
-                                            sandbox->id_map.groups);
+        err = conty_user_write_own_gid_mappings(sandbox->id_map.groups);
+        if (err != 0)
+            return LOG_ERROR_RET(err, "sandbox: cannot write gid mappings");
     }
 
     return err;
@@ -48,22 +51,23 @@ static int conty_sandbox_mount_rootfs(struct conty_sandbox *sandbox)
     int err;
     struct conty_rootfs *rootfs = &sandbox->rootfs;
 
-    if ((err = conty_bind_mount_do(sandbox->rootfs.mnt)) != 0)
+    if ((err = conty_bind_mount_do(rootfs->mnt)) != 0)
         return err;
 
-    sandbox->rootfs.dfd_mnt = openat(-EBADF, sandbox->rootfs.mnt->target,
+    rootfs->dfd_mnt = openat(-EBADF, rootfs->mnt->target,
                                      O_NOFOLLOW | O_PATH | O_CLOEXEC | O_DIRECTORY);
 
-    return (sandbox->rootfs.dfd_mnt < 0) ? -errno : 0;
+    return (rootfs->dfd_mnt < 0) ? -errno : 0;
 }
 
-static int conty_sandbox_configure(struct conty_sandbox *sandbox)
+/*
+ * The entry point of the sandbox
+ * The execution context resides in a namespaced environment configured by
+ * the runtime.
+ */
+int __conty_sandbox_run(void *sb)
 {
-    /*
-     * Use the raw getpid system call, because glibc might cache pids and
-     * we don't want the sandbox to think that it's the runtime..
-     */
-    sandbox->pid = conty_getpid();
+    struct conty_sandbox *sandbox = (struct conty_sandbox *) sb;
 
     if (sandbox->ns_new & CLONE_NEWUSER) {
         /*
@@ -101,39 +105,10 @@ static int conty_sandbox_configure(struct conty_sandbox *sandbox)
             goto err_notify_rt;
     }
 
+    return 0;
+
 err_notify_rt:
     return -1;
-}
-
-/*
- * The entry point of the sandbox
- * The execution context resides in a namespaced environment configured by
- * the runtime.
- */
-int __conty_sandbox_run(void *sb)
-{
-    struct conty_sandbox *sandbox = (struct conty_sandbox *) sb;
-    sandbox->pid = conty_getpid();
-
-    if (sandbox->ns_new & CLONE_NEWUSER) {
-        /*
-         * Configure identifier mappings between the parent
-         * user namespace and that of the sandbox.
-         */
-        if (conty_sandbox_write_mappings(sandbox) != 0)
-            return -1;
-
-    }
-
-    if (sandbox->ns_new & CLONE_NEWUTS) {
-        /*
-         * Configure ns_new hostname
-         */
-        if (sethostname(sandbox->hostname, strlen(sandbox->hostname)) != 0)
-            return -1;
-    }
-
-    return 0;
 }
 
 int __conty_sandbox_setup(void *sb)
@@ -141,7 +116,6 @@ int __conty_sandbox_setup(void *sb)
     int nsfd;
     struct conty_sandbox *sandbox = (struct conty_sandbox *) sb;
 
-    sandbox->ns_old = 0;
     for (conty_ns_t ns = 0; ns < CONTY_NS_SIZE; ns++) {
         nsfd = sandbox->ns_fds[ns];
         if (nsfd < 0)
@@ -149,8 +123,6 @@ int __conty_sandbox_setup(void *sb)
 
         if (conty_ns_set(nsfd, 0) < 0)
             return -1;
-
-        sandbox->ns_old |= conty_ns_flags[ns];
     }
 
     /*

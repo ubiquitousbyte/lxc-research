@@ -37,6 +37,8 @@ target_sources(conty
         ${CONTY_PRIVATE}/clone.c
         ${CONTY_PRIVATE}/ipc.h
         ${CONTY_PRIVATE}/ipc.c
+        ${CONTY_PRIVATE}/log.h
+        ${CONTY_PRIVATE}/log.c
     PUBLIC
         ${CONTY_PUBLIC_HDR}/conty.h)
 

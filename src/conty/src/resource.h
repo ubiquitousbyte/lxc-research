@@ -58,6 +58,4 @@ static inline void conty_free_mem_function(void *ptr)
 
 #define __CONTY_FREE CONTY_INVOKE_CLEANER(conty_free_mem)
 
-
-
 #endif //CONTY_RESOURCE_H

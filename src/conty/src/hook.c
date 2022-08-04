@@ -65,11 +65,11 @@ static int __conty_hook_exec(const char *prog, const char *argv[], const char *e
             return (WIFEXITED(status) && WEXITSTATUS(status) != 0) ? -1 : 0;
         }
     }
-};
+}
 
 int conty_hook_exec(const struct conty_hook *hook, const char *buf,
-                    size_t buf_len, int timeout)
+                    size_t buf_len)
 {
     return __conty_hook_exec(hook->prog, hook->argv, hook->envp,
-                             buf, buf_len, timeout);
+                             buf, buf_len, hook->timeout);
 }

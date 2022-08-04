@@ -9,23 +9,24 @@ extern "C" {
 #include "hook.h"
 #include "user.h"
 #include "queue.h"
+#include "mount.h"
 
 struct conty_sandbox {
     struct {
         /*
          * Namespaces to create
          */
-        unsigned long new;
+        unsigned long ns_new;
         /*
          * Namespaces to join
          */
-        unsigned long old;
+        unsigned long ns_old;
         /*
          * File descriptors of joined namespaces
          * Initially, this contains the file descriptors
-         * of namespaces defined in old
+         * of namespaces defined in ns_old
          */
-        int           fds[CONTY_NS_SIZE];
+        int           ns_fds[CONTY_NS_SIZE];
     };
 
     /*
@@ -50,8 +51,6 @@ struct conty_sandbox {
     /*
      * Socket file descriptors used for inter-process communication
      * between the sandbox and the runtime
-     *
-     * Primarily used to exchange file descriptors
      */
     int ipc_fds[2];
     /*
@@ -62,19 +61,15 @@ struct conty_sandbox {
      * Pollable process file descriptor for the sandbox
      */
     int pidfd;
-
-    struct {
-        /*
-         * General configuration flags for root filesystem mount point
-         */
-        unsigned long flags;
-        /*
-         * Mount propagation type of the root filesystem
-         */
-        unsigned long propagation;
-    } rootfs;
-
+    /*
+     * Sandbox host name
+     */
     const char hostname[255];
+    /*
+     * Sandbox root filesystem
+     */
+    struct conty_rootfs rootfs;
+
 };
 
 int conty_sandbox_start(struct conty_sandbox *sandbox);

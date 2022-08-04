@@ -5,14 +5,18 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <string.h>
+#include <fcntl.h>
+#include <errno.h>
 
 #include "clone.h"
 #include "user.h"
+#include "syscall.h"
+#include "mount.h"
 
 static int conty_sandbox_join_existing(const struct conty_sandbox *sandbox)
 {
     for (conty_ns_t ns = 0; ns < CONTY_NS_SIZE; ns++) {
-        if (sandbox->fds[ns] >= 0)
+        if (sandbox->ns_fds[ns] >= 0)
             return 1;
     }
     return 0;
@@ -21,7 +25,6 @@ static int conty_sandbox_join_existing(const struct conty_sandbox *sandbox)
 static int conty_sandbox_write_mappings(const struct conty_sandbox *sandbox)
 {
     int err = 0;
-
     if (sandbox->id_map.users) {
         err = conty_user_write_uid_mappings(sandbox->pid, sandbox->id_map.users);
         if (err != 0)
@@ -29,9 +32,6 @@ static int conty_sandbox_write_mappings(const struct conty_sandbox *sandbox)
     }
 
     if (sandbox->id_map.groups) {
-        /*
-         * TODO: Check if runtime has the CAP_SETGID cap and don't deny if yes
-         */
         err = conty_user_disable_setgroups(sandbox->pid);
         if (err != 0)
             return -1;
@@ -43,6 +43,68 @@ static int conty_sandbox_write_mappings(const struct conty_sandbox *sandbox)
     return err;
 }
 
+static int conty_sandbox_mount_rootfs(struct conty_sandbox *sandbox)
+{
+    int err;
+    struct conty_rootfs *rootfs = &sandbox->rootfs;
+
+    if ((err = conty_bind_mount_do(sandbox->rootfs.mnt)) != 0)
+        return err;
+
+    sandbox->rootfs.dfd_mnt = openat(-EBADF, sandbox->rootfs.mnt->target,
+                                     O_NOFOLLOW | O_PATH | O_CLOEXEC | O_DIRECTORY);
+
+    return (sandbox->rootfs.dfd_mnt < 0) ? -errno : 0;
+}
+
+static int conty_sandbox_configure(struct conty_sandbox *sandbox)
+{
+    /*
+     * Use the raw getpid system call, because glibc might cache pids and
+     * we don't want the sandbox to think that it's the runtime..
+     */
+    sandbox->pid = conty_getpid();
+
+    if (sandbox->ns_new & CLONE_NEWUSER) {
+        /*
+         * Write identifier mappings between parent and sandbox
+         */
+        if (conty_sandbox_write_mappings(sandbox) != 0)
+            goto err_notify_rt;
+    }
+
+    if (sandbox->ns_new & CLONE_NEWUTS) {
+        /*
+         * Configure sandbox hostname
+         */
+        if (sethostname(sandbox->hostname, strlen(sandbox->hostname)) != 0)
+            goto err_notify_rt;
+    }
+
+    if (sandbox->ns_new & CLONE_NEWNS) {
+        /*
+         * Bind mount the root filesystem into the sandbox mount namespace
+         */
+        if (conty_sandbox_mount_rootfs(sandbox) != 0)
+            goto err_notify_rt;
+
+        /*
+         * Mount all pseudo filesystems like proc and sys
+         */
+        if (conty_rootfs_mount_pseudofs(&sandbox->rootfs) != 0)
+            goto err_notify_rt;
+
+        /*
+         * Pivot root into new root filesystem
+         */
+        if (conty_rootfs_pivot(&sandbox->rootfs) != 0)
+            goto err_notify_rt;
+    }
+
+err_notify_rt:
+    return -1;
+}
+
 /*
  * The entry point of the sandbox
  * The execution context resides in a namespaced environment configured by
@@ -50,32 +112,24 @@ static int conty_sandbox_write_mappings(const struct conty_sandbox *sandbox)
  */
 int __conty_sandbox_run(void *sb)
 {
-    int err;
     struct conty_sandbox *sandbox = (struct conty_sandbox *) sb;
-    struct conty_hook *cur, *tmp;
+    sandbox->pid = conty_getpid();
 
-    if (sandbox->new & CLONE_NEWUSER) {
+    if (sandbox->ns_new & CLONE_NEWUSER) {
         /*
          * Configure identifier mappings between the parent
          * user namespace and that of the sandbox.
          */
         if (conty_sandbox_write_mappings(sandbox) != 0)
             return -1;
+
     }
 
-    if (sandbox->new & CLONE_NEWUTS) {
+    if (sandbox->ns_new & CLONE_NEWUTS) {
         /*
-         * Configure new hostname
+         * Configure ns_new hostname
          */
         if (sethostname(sandbox->hostname, strlen(sandbox->hostname)) != 0)
-            return -1;
-    }
-
-    /*
-     * Run start hooks before executing the actual program
-     */
-    TAILQ_FOREACH_SAFE(cur, &sandbox->hooks.on_sb_start, next, tmp) {
-        if (conty_hook_exec(cur, NULL, 0, 0) != 0)
             return -1;
     }
 
@@ -85,19 +139,18 @@ int __conty_sandbox_run(void *sb)
 int __conty_sandbox_setup(void *sb)
 {
     int nsfd;
-    unsigned long flags;
     struct conty_sandbox *sandbox = (struct conty_sandbox *) sb;
 
-    sandbox->old = 0;
+    sandbox->ns_old = 0;
     for (conty_ns_t ns = 0; ns < CONTY_NS_SIZE; ns++) {
-        nsfd = sandbox->fds[ns];
+        nsfd = sandbox->ns_fds[ns];
         if (nsfd < 0)
             continue;
 
         if (conty_ns_set(nsfd, 0) < 0)
             return -1;
 
-        sandbox->old |= conty_ns_flags[ns];
+        sandbox->ns_old |= conty_ns_flags[ns];
     }
 
     /*
@@ -107,7 +160,7 @@ int __conty_sandbox_setup(void *sb)
      * intermediate process in the process hierarchy
      */
     sandbox->pid = conty_clone3_cb(__conty_sandbox_run, sandbox,
-                                   sandbox->new | CLONE_PARENT | CLONE_PIDFD,
+                                   sandbox->ns_new | CLONE_PARENT | CLONE_PIDFD,
                                    &sandbox->pidfd);
 
     return (sandbox->pid < 0) ? -1: 0;
@@ -163,7 +216,7 @@ int conty_sandbox_start(struct conty_sandbox *sandbox)
          * we can directly clone it here
          */
         sandbox->pid = conty_clone3_cb(__conty_sandbox_run, sandbox,
-                                       sandbox->new, &sandbox->pidfd);
+                                       sandbox->ns_new, &sandbox->pidfd);
         if (sandbox->pid < 0)
             return -1;
     }

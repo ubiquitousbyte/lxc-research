@@ -30,8 +30,13 @@ target_sources(conty
         ${CONTY_PRIVATE}/queue.h
         ${CONTY_PRIVATE}/sandbox.h
         ${CONTY_PRIVATE}/sandbox.c
+        ${CONTY_PRIVATE}/user.h
+        ${CONTY_PRIVATE}/user.c
+        ${CONTY_PRIVATE}/resource.h
         ${CONTY_PRIVATE}/clone.h
         ${CONTY_PRIVATE}/clone.c
+        ${CONTY_PRIVATE}/ipc.h
+        ${CONTY_PRIVATE}/ipc.c
     PUBLIC
         ${CONTY_PUBLIC_HDR}/conty.h)
 

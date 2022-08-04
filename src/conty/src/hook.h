@@ -18,11 +18,11 @@ struct conty_hook {
     const char             *prog;
     const char            **argv;
     const char            **envp;
+    int                     timeout;
     TAILQ_ENTRY(conty_hook) next;
 };
 
-int conty_hook_exec(const struct conty_hook *hook, const char *buf,
-                    size_t buf_len, int timeout);
+int conty_hook_exec(const struct conty_hook *hook, const char *buf, size_t buf_len);
 
 #ifdef __cplusplus
 }; // extern "C"

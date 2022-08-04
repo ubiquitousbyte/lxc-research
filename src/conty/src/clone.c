@@ -4,10 +4,11 @@
 #include <stdint.h>
 #include <sys/signal.h>
 #include <sched.h>
-#include <linux/types.h>
 
 #include "resource.h"
 #include "syscall.h"
+
+#include <linux/sched.h>
 
 #define __CONTY_STACK_SIZE (8 * 1024 * 1024)
 pid_t conty_clone(int (*fn)(void *), void *arg, int flags, int *pidfd)

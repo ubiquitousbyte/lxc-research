@@ -17,7 +17,7 @@ int conty_ns_open(conty_ns_t ns, pid_t pid)
     sprintf(path, "/proc/%d/ns/%s", pid, conty_ns_names[ns]);
     nsfd = open(path, O_RDONLY | O_CLOEXEC);
     if (nsfd < 0)
-        return -1;
+        return -errno;
 
     return nsfd;
 }

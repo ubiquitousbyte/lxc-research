@@ -12,7 +12,11 @@ extern "C" {
 #include <unistd.h>
 #include <sched.h>
 #include <sys/syscall.h>
-#include <linux/sched.h>
+
+#include <sys/mount.h>
+
+struct mount_attr;
+struct clone_args;
 
 static inline int conty_pidfd_open(pid_t pid, unsigned int flags)
 {
@@ -64,9 +68,21 @@ static inline int conty_pivot_root(const char *new_root, const char *put_old)
     return syscall(SYS_pivot_root, new_root, put_old);
 }
 
+static inline int conty_mount_setattr(int dirfd, const char *pathname,
+                                      unsigned int flags, struct mount_attr *attr,
+                                      size_t size)
+{
+    return syscall(SYS_mount_setattr, dirfd, pathname, flags, attr, size);
+}
+
 static inline int conty_clone3_raw(struct clone_args *args, size_t args_size)
 {
     return syscall(SYS_clone3, args, args_size);
+}
+
+static inline int conty_getpid()
+{
+    return syscall(SYS_getpid);
 }
 
 #ifdef __cplusplus

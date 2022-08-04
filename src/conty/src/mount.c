@@ -1,8 +1,5 @@
 #include "mount.h"
 
-#include "resource.h"
-#include "syscall.h"
-
 #include <sys/mount.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -10,8 +7,13 @@
 #include <string.h>
 #include <unistd.h>
 #include <limits.h>
+#include <errno.h>
 
 #include <linux/mount.h>
+
+#include "resource.h"
+#include "syscall.h"
+#include "log.h"
 
 #ifndef PATH_MAX
 #define PATH_MAX 4096
@@ -38,7 +40,7 @@ static int __conty_bind_mount(int dfd_src, int dfd_dst,
     unsigned int ot_flags = AT_EMPTY_PATH | OPEN_TREE_CLONE | OPEN_TREE_CLOEXEC;
     fd_tree_from = conty_open_tree(dfd_src, "", ot_flags);
     if (fd_tree_from < 0)
-        return -errno;
+        return LOG_ERROR_RET(-errno, "mount: could not detach fd %d", dfd_src);
 
     if (attr.attr_set) {
         /*
@@ -48,7 +50,7 @@ static int __conty_bind_mount(int dfd_src, int dfd_dst,
                                   AT_EMPTY_PATH | (recursive ? AT_RECURSIVE : 0),
                                   &attr, sizeof(attr));
         if (err < 0)
-            return -errno;
+            return LOG_ERROR_RET(-errno, "mount: could not setattr on %d", fd_tree_from);
     }
 
     /*
@@ -57,6 +59,9 @@ static int __conty_bind_mount(int dfd_src, int dfd_dst,
      */
     err = conty_move_mount(fd_tree_from, "", dfd_dst, "",
                            MOVE_MOUNT_F_EMPTY_PATH | MOVE_MOUNT_T_EMPTY_PATH);
+
+    if (err < 0)
+        return LOG_ERROR_RET(-errno, "mount: %d to %d failed", fd_tree_from, dfd_dst);
 
     return (err < 0) ? -errno : 0;
 }
@@ -68,12 +73,12 @@ int conty_bind_mount_do(const struct conty_bind_mount *mnt)
     fd_target = openat(-EBADF, mnt->target,
                        O_NOFOLLOW | O_PATH | O_CLOEXEC | O_DIRECTORY);
     if (fd_target < 0)
-        return -errno;
+        return LOG_ERROR_RET(-errno, "mount: cannot open target %s", mnt->target);
 
     fd_src = openat(-EBADF, mnt->source,
                     O_NOFOLLOW | O_PATH | O_CLOEXEC | O_DIRECTORY);
     if (fd_src < 0)
-        return -errno;
+        return LOG_ERROR_RET(-errno, "mount: cannot open source %s", mnt->source);
 
     return __conty_bind_mount(fd_src, fd_target,
                               mnt->attr_set, mnt->attr_clear,
@@ -96,7 +101,9 @@ int conty_rootfs_mount_pseudofs(const struct conty_rootfs *rootfs)
      * Unmount the pseudo filesystem from the new root filesystem
      * if it was somehow mounted before
      */
-    umount2(buf, MNT_DETACH);
+    err = umount2(buf, MNT_DETACH);
+    if (err)
+        LOG_INFO("mount: skipping umount for %s", buf);
 
     /*
      * Try to create pseudo filesystem directory under the configured
@@ -105,14 +112,14 @@ int conty_rootfs_mount_pseudofs(const struct conty_rootfs *rootfs)
     err = mkdirat(rootfs->dfd_mnt, "proc",
                   S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
     if (err < 0 && errno != EEXIST)
-        return -errno;
+        return LOG_ERROR_RET(-errno, "mount: cannot create dentry %s", buf);
 
     /*
      * Mount proc onto the new root filesystem
      */
     err = mount("proc", buf, "proc", MS_NOEXEC | MS_NOSUID | MS_NODEV, NULL);
     if (err != 0)
-        return -errno;
+        return LOG_ERROR_RET(-errno, "mount: cannot mount procfs on %s", buf);
 
     /*
      * Reset the buffer and do the same thing with sysfs
@@ -125,9 +132,13 @@ int conty_rootfs_mount_pseudofs(const struct conty_rootfs *rootfs)
     err = mkdirat(rootfs->dfd_mnt, "sys",
                   S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
     if (err < 0 && errno != EEXIST)
-        return -errno;
+        return LOG_ERROR_RET(-errno, "mount: cannot create dentry %s", buf);
 
-    return (mount("sysfs", buf, "sysfs", 0, NULL) < 0) ? -errno : 0;
+    err = mount("sysfs", buf, "sysfs", 0, NULL);
+    if (err < 0)
+        return LOG_ERROR_RET(-errno, "mount: cannot mount sysfs on %s", buf);
+
+    return 0;
 }
 
 int conty_rootfs_pivot(const struct conty_rootfs *rootfs)
@@ -142,14 +153,14 @@ int conty_rootfs_pivot(const struct conty_rootfs *rootfs)
      */
     old_root = openat(-EBADF, "/", O_NOFOLLOW | O_PATH | O_CLOEXEC | O_DIRECTORY);
     if (old_root < 0)
-        return -errno;
+        return LOG_ERROR_RET(-errno, "pivot: cannot open old rootfs");
 
     /*
      * Switch to the rootfs directory
      */
     err = fchdir(rootfs->dfd_mnt);
     if (err < 0)
-        return -errno;
+        return LOG_ERROR_RET(-errno, "pivot: cannot chdir to %s", rootfs->mnt->target);
 
     /*
      * Pivot root into the current directory, which happens to be our
@@ -175,7 +186,7 @@ int conty_rootfs_pivot(const struct conty_rootfs *rootfs)
      */
     err = conty_pivot_root(".", ".");
     if (err < 0)
-        return -errno;
+        return LOG_ERROR_RET(-errno, "pivot: cannot chroot");
 
     /*
      * Now change dir to old root, which is technically layered on top of
@@ -185,7 +196,7 @@ int conty_rootfs_pivot(const struct conty_rootfs *rootfs)
      */
     err = fchdir(old_root);
     if (err < 0)
-        return -errno;
+        return LOG_ERROR_RET(-errno, "pivot: cannot umount old root");
 
     /*
      * The old root filesystem
@@ -205,17 +216,18 @@ int conty_rootfs_pivot(const struct conty_rootfs *rootfs)
      */
     err = mount("", ".", "", MS_SLAVE | MS_REC, NULL);
     if (err < 0)
-        return -errno;
+        return LOG_ERROR_RET(-errno, "pivot: cannot umount old root");
 
     /*
      * Now it's safe to unmount old_root
      */
     err = umount2(".", MNT_DETACH);
     if (err < 0)
-        return -errno;
+        return LOG_ERROR_RET(-errno, "pivot: cannot umount old root");
 
-    /*
-     * Move back to new root
-     */
-    return ((err = fchdir(rootfs->dfd_mnt)) < 0) ? -errno : err;
+    err = fchdir(rootfs->dfd_mnt);
+    if (err < 0)
+        return LOG_ERROR_RET(-errno, "pivot: cannot switch to new root");
+
+    return err;
 }

@@ -52,7 +52,6 @@ static inline int conty_ns_open_current(conty_ns_t ns)
 
 int conty_ns_unshare(int flags);
 int conty_ns_set(int fd, int type);
-
 int conty_ns_parent(int fd);
 
 #ifdef __cplusplus

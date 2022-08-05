@@ -1,5 +1,6 @@
 #ifndef CONTY_MOUNT_H
 #define CONTY_MOUNT_H
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -37,22 +38,22 @@ struct conty_bind_mount {
  */
 int conty_bind_mount_do(const struct conty_bind_mount *mnt);
 
-/*
- * Removes the bind mount from the filesystem
- */
-int conty_bind_mount_undo(const struct conty_bind_mount *mnt);
-
 struct conty_rootfs {
-    struct conty_bind_mount *mnt;
+    /*
+     * The bind mount that transforms an arbitrary directory holding
+     * the root filesystem into a mount which can later be pivoted
+     * by a sandbox
+     */
+    struct conty_bind_mount  mnt;
+    /*
+     * File descriptor to the mounted root filesystem
+     */
     int                      dfd_mnt;
 };
 
 /*
- * Mounts all pseudo filesystems at their default destinations
- * relative to a root filesystem
+ * Pivot changes the root mount in the mount namespace to rootfs
  */
-int conty_rootfs_mount_pseudofs(const struct conty_rootfs *rootfs);
-
 int conty_rootfs_pivot(const struct conty_rootfs *rootfs);
 
 #ifdef __cplusplus

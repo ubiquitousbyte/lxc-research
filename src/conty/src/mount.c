@@ -85,62 +85,6 @@ int conty_bind_mount_do(const struct conty_bind_mount *mnt)
                               mnt->propagation, 1);
 }
 
-int conty_bind_mount_undo(const struct conty_bind_mount *mnt)
-{
-    return umount2(mnt->target, MNT_DETACH);
-}
-
-int conty_rootfs_mount_pseudofs(const struct conty_rootfs *rootfs)
-{
-    int err;
-    char buf[PATH_MAX];
-
-    snprintf(buf, sizeof(buf), "%s/proc", rootfs->mnt->target);
-
-    /*
-     * Unmount the pseudo filesystem from the new root filesystem
-     * if it was somehow mounted before
-     */
-    err = umount2(buf, MNT_DETACH);
-    if (err)
-        LOG_INFO("mount: skipping umount for %s", buf);
-
-    /*
-     * Try to create pseudo filesystem directory under the configured
-     * root filesystem if there isn't one
-     */
-    err = mkdirat(rootfs->dfd_mnt, "proc",
-                  S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
-    if (err < 0 && errno != EEXIST)
-        return LOG_ERROR_RET(-errno, "mount: cannot create dentry %s", buf);
-
-    /*
-     * Mount proc onto the new root filesystem
-     */
-    err = mount("proc", buf, "proc", MS_NOEXEC | MS_NOSUID | MS_NODEV, NULL);
-    if (err != 0)
-        return LOG_ERROR_RET(-errno, "mount: cannot mount procfs on %s", buf);
-
-    /*
-     * Reset the buffer and do the same thing with sysfs
-     */
-    memset(buf, 0, sizeof(buf));
-    snprintf(buf, sizeof(buf), "%s/sys", rootfs->mnt->target);
-
-    umount2(buf, MNT_DETACH);
-
-    err = mkdirat(rootfs->dfd_mnt, "sys",
-                  S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
-    if (err < 0 && errno != EEXIST)
-        return LOG_ERROR_RET(-errno, "mount: cannot create dentry %s", buf);
-
-    err = mount("sysfs", buf, "sysfs", 0, NULL);
-    if (err < 0)
-        return LOG_ERROR_RET(-errno, "mount: cannot mount sysfs on %s", buf);
-
-    return 0;
-}
-
 int conty_rootfs_pivot(const struct conty_rootfs *rootfs)
 {
     __CONTY_CLOSE int old_root = -EBADF;
@@ -160,7 +104,7 @@ int conty_rootfs_pivot(const struct conty_rootfs *rootfs)
      */
     err = fchdir(rootfs->dfd_mnt);
     if (err < 0)
-        return LOG_ERROR_RET(-errno, "pivot: cannot chdir to %s", rootfs->mnt->target);
+        return LOG_ERROR_RET(-errno, "pivot: cannot chdir to %s", rootfs->mnt.target);
 
     /*
      * Pivot root into the current directory, which happens to be our

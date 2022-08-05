@@ -58,4 +58,12 @@ static inline void conty_free_mem_function(void *ptr)
 
 #define __CONTY_FREE CONTY_INVOKE_CLEANER(conty_free_mem)
 
+
+#define CONTY_MOVE_PTR(ptr)                     \
+    ({                                          \
+        __typeof(ptr) __internal_ptr__ = (ptr); \
+        (ptr) = NULL;                           \
+        __internal_ptr__;                       \
+    })
+
 #endif //CONTY_RESOURCE_H

@@ -19,8 +19,8 @@ int conty_user_id_map_init(struct conty_user_id_map *m, char *buf, size_t buf_si
     return 0;
 }
 
-int conty_user_id_map_put(struct conty_user_id_map *m, unsigned left,
-                          unsigned right, unsigned range)
+int conty_user_id_map_put(struct conty_user_id_map *m, unsigned int left,
+                          unsigned int right, unsigned int range)
 {
     if (range < 1)
         return -EINVAL;

@@ -1,6 +1,10 @@
 #ifndef CONTY_USER_H
 #define CONTY_USER_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stddef.h>
 #include <stdint.h>
 #include <unistd.h>
@@ -16,8 +20,8 @@ struct conty_user_id_map {
 
 int conty_user_id_map_init(struct conty_user_id_map *m, char *buf, size_t buf_size);
 
-int conty_user_id_map_put(struct conty_user_id_map *m, unsigned left,
-                          unsigned right, unsigned range);
+int conty_user_id_map_put(struct conty_user_id_map *m, unsigned int left,
+                          unsigned int right, unsigned int range);
 
 int __conty_user_write_mappings(const struct conty_user_id_map *map,
                                const char *path);
@@ -74,5 +78,9 @@ static inline int conty_user_disable_own_setgroups()
 {
     return __conty_user_disable_setgroups("/proc/self/setgroups");
 }
+
+#ifdef __cplusplus
+}; // extern "C"
+#endif
 
 #endif //CONTY_USER_H

@@ -20,12 +20,12 @@ static struct {
 } CONTY_LOGGER;
 
 
-static void conty_log_set_level(int level)
+void conty_log_set_level(int level)
 {
     CONTY_LOGGER.level = level;
 }
 
-static void conty_log_set_quiet(int quiet)
+void conty_log_set_quiet(int quiet)
 {
     CONTY_LOGGER.quiet = quiet;
 }

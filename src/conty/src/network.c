@@ -10,9 +10,6 @@
 #include "resource.h"
 #include "log.h"
 
-CONTY_CREATE_CLEANUP_FUNC(struct rtnl_link *, rtnl_link_put);
-CONTY_CREATE_CLEANUP_FUNC(struct nl_sock *, nl_socket_free);
-
 struct conty_network {
     /*
      * Netlink socket used for communicating with the kernel

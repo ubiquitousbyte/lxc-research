@@ -23,6 +23,11 @@ int conty_user_id_map_init(struct conty_user_id_map *m, char *buf, size_t buf_si
 int conty_user_id_map_put(struct conty_user_id_map *m, unsigned int left,
                           unsigned int right, unsigned int range);
 
+static inline int conty_user_id_map_is_empty(const struct conty_user_id_map *map)
+{
+    return map->written == 0;
+}
+
 int __conty_user_write_mappings(const struct conty_user_id_map *map,
                                const char *path);
 

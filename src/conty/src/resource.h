@@ -56,7 +56,19 @@ static inline void conty_free_mem_function(void *ptr)
     CONTY_MEM_CLEANER(*(void **) ptr);
 }
 
+static inline void conty_free_strings(char **ptr)
+{
+    if (ptr) {
+        for (int i = 0; ptr[i]; i++)
+            free(ptr[i]);
+        free(ptr);
+    }
+}
+
 #define __CONTY_FREE CONTY_INVOKE_CLEANER(conty_free_mem)
+
+CONTY_CREATE_CLEANUP_FUNC(char **, conty_free_strings);
+#define __CONTY_FREE_STRLIST CONTY_INVOKE_CLEANER(conty_free_strings)
 
 
 #define CONTY_MOVE_PTR(ptr)                     \

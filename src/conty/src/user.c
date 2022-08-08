@@ -12,6 +12,8 @@ int conty_user_id_map_init(struct conty_user_id_map *m, char *buf, size_t buf_si
     if (buf_size > CONTY_USER_ID_MAP_MAX)
         return -ENOSPC;
 
+    memset(buf, 0, buf_size);
+
     m->buf = buf;
     m->cap = buf_size;
     m->written = 0;

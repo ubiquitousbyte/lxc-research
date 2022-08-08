@@ -19,7 +19,16 @@ add_executable(user-test user-test.cpp)
 target_link_libraries(user-test PRIVATE conty gtest_main)
 set_property(TARGET user-test PROPERTY TEST 1)
 
+add_executable(network-test network-test.cpp)
+target_link_libraries(network-test PRIVATE conty gtest_main)
+set_property(TARGET network-test PROPERTY TEST 1)
+
+add_executable(container-test container-test.cpp)
+target_link_libraries(container-test PRIVATE conty gtest_main)
+set_property(TARGET container-test PROPERTY TEST 1)
+
 include(GoogleTest)
 gtest_discover_tests(hook-test)
 gtest_discover_tests(conf-test)
 gtest_discover_tests(user-test)
+gtest_discover_tests(network-test)

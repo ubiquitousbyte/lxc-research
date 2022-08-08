@@ -28,23 +28,21 @@ target_sources(conty
         ${CONTY_PRIVATE}/hook.h
         ${CONTY_PRIVATE}/mount.h
         ${CONTY_PRIVATE}/mount.c
+        ${CONTY_PRIVATE}/network.c
+        ${CONTY_PRIVATE}/network.h
         ${CONTY_PRIVATE}/syscall.h
         ${CONTY_PRIVATE}/queue.h
-        ${CONTY_PRIVATE}/sandbox.h
-        ${CONTY_PRIVATE}/sandbox.c
         ${CONTY_PRIVATE}/user.h
         ${CONTY_PRIVATE}/user.c
         ${CONTY_PRIVATE}/resource.h
         ${CONTY_PRIVATE}/clone.h
         ${CONTY_PRIVATE}/clone.c
-        ${CONTY_PRIVATE}/ipc.h
-        ${CONTY_PRIVATE}/ipc.c
         ${CONTY_PRIVATE}/log.h
         ${CONTY_PRIVATE}/log.c
-        ${CONTY_PRIVATE}/conf.h
-        ${CONTY_PRIVATE}/conf.c
-        ${CONTY_PRIVATE}/network.h
-        ${CONTY_PRIVATE}/network.c
+        ${CONTY_PRIVATE}/oci.h
+        ${CONTY_PRIVATE}/oci-json.c
+        ${CONTY_PRIVATE}/container.h
+        ${CONTY_PRIVATE}/container.c
     PUBLIC
         ${CONTY_PUBLIC_HDR}/conty.h)
 

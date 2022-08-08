@@ -5,56 +5,30 @@
 extern "C" {
 #endif
 
-/*
- * A bind mount
- */
-struct conty_bind_mount {
-    /*
-     * The source directory on the host system
-     */
-    const char *source;
-    /*
-     * The target directory inside the mount namespace of the sandbox
-     */
-    const char *target;
-    /*
-     * File system event propagation type
-     * Effectively determines the noninterference boundary between
-     * filesystems in different sandboxes
-     */
-    unsigned long propagation;
-    /*
-     * Mount point attributes to set
-     */
-    unsigned long attr_set;
-    /*
-     * Mount point attributes to clear
-     */
-    unsigned long attr_clear;
-};
-
-/*
- * Creates the bind mount on the filesystem
- */
-int conty_bind_mount_do(const struct conty_bind_mount *mnt);
-
 struct conty_rootfs {
-    /*
-     * The bind mount that transforms an arbitrary directory holding
-     * the root filesystem into a mount which can later be pivoted
-     * by a sandbox
-     */
-    struct conty_bind_mount  mnt;
-    /*
-     * File descriptor to the mounted root filesystem
-     */
-    int                      dfd_mnt;
+    const char              *cr_source;
+    const char              *cr_target;
+    char                     cr_ro;
+    int                      cr_dfd_mnt;
 };
+
+void conty_rootfs_init_runtime(struct conty_rootfs *rootfs, const char *source,
+                              const char *target, char readonly);
+
+int conty_rootfs_init_container(struct conty_rootfs *rootfs);
+
+int conty_rootfs_mount(const struct conty_rootfs *rootfs);
 
 /*
  * Pivot changes the root mount in the mount namespace to rootfs
  */
 int conty_rootfs_pivot(const struct conty_rootfs *rootfs);
+
+int conty_rootfs_mount_devices(const struct conty_rootfs *rootfs);
+
+int conty_rootfs_mount_proc(const struct conty_rootfs *rootfs);
+
+int conty_rootfs_mount_sys(const struct conty_rootfs *rootfs);
 
 #ifdef __cplusplus
 }; // extern "C"

@@ -51,7 +51,7 @@ enum {
 
 #define LOG_ERROR_RET_ERRNO(__ret__, __errno__, fmt, ...) \
     ({                                                          \
-        typeof(__ret__) __int_ret__ = (__ret__);                \
+        __typeof(__ret__) __int_ret__ = (__ret__);                \
         errno = __errno__;                                      \
         LOG_ERROR(fmt, ##__VA_ARGS__);                    \
         __int_ret__;                                            \

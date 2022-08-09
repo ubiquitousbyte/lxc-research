@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 /*
  * Inspired by
@@ -28,12 +29,12 @@
 #define CONTY_INVOKE_CLEANER(cleaner) \
 	    __attribute__((__cleanup__(cleaner##_function))) __attribute__((unused))
 
-#define CONTY_FD_CLEANER(fd)   \
-        if (fd >= 0) {         \
-            int __er_ = errno; \
-            close(fd);         \
-            errno = __er_;     \
-            fd = -EBADF;       \
+#define CONTY_FD_CLEANER(fd)     \
+        if ((fd) >= 0) {         \
+            int __er_ = errno;   \
+            close(fd);           \
+            errno = __er_;       \
+            (fd) = -EBADF;       \
         }
 
 static inline void conty_close_fd_function(int *fd)
@@ -70,7 +71,6 @@ static inline void conty_free_strings(char **ptr)
 CONTY_CREATE_CLEANUP_FUNC(char **, conty_free_strings);
 #define __CONTY_FREE_STRLIST CONTY_INVOKE_CLEANER(conty_free_strings)
 
-
 #define CONTY_MOVE_PTR(ptr)                     \
     ({                                          \
         __typeof(ptr) __internal_ptr__ = (ptr); \
@@ -78,11 +78,20 @@ CONTY_CREATE_CLEANUP_FUNC(char **, conty_free_strings);
         __internal_ptr__;                       \
     })
 
-#define CONTY_MOVE_FD(fd) \
-    ({                    \
+#define CONTY_MOVE_FD(fd)                    \
+    ({                                       \
         __typeof(fd) __internal_fd__ = (fd); \
-        (fd) = -EBADF;    \
-        __internal_fd__; \
+        (fd) = -EBADF;                       \
+        __internal_fd__;                     \
+    })
+
+#define CONTY_SNPRINTF(buf, buf_size, ...)                                        \
+    ({                                                                            \
+        int __ret__snprintf;                                                      \
+        __ret__snprintf = snprintf(buf, buf_size, ##__VA_ARGS__);                 \
+        if (__ret__snprintf < 0 || (size_t) __ret__snprintf >= (size_t) buf_size) \
+            __ret__snprintf = -EIO;                                               \
+        __ret__snprintf;                                                          \
     })
 
 #endif //CONTY_RESOURCE_H

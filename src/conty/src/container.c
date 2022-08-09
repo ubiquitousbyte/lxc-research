@@ -5,6 +5,7 @@
 
 #include "log.h"
 #include "clone.h"
+#include "resource.h"
 
 static int conty_container_init_ns(struct conty_container *cc)
 {
@@ -46,19 +47,20 @@ static int conty_container_init_ns(struct conty_container *cc)
 
 static int conty_container_rootfs_init(struct conty_container *cc)
 {
+    int err;
     char cwd[PATH_MAX];
     char id[64];
-
     struct oci_rootfs *oci_rfs = &cc->cc_oci_conf->oc_rootfs;
 
-    cc->cc_mnt_root.crfs_source = CONTY_MOVE_PTR(oci_rfs->ocirfs_path);
-
+    cc->cc_mnt_root.crfs_source = oci_rfs->ocirfs_path;
     if (!getcwd(cwd, PATH_MAX))
         return LOG_ERROR_RET(-errno, "cannot open cwd");
 
-    snprintf(id, 64, "/%s", cc->cc_id);
-    strncat(cwd, id, PATH_MAX);
+    err = CONTY_SNPRINTF(id, 64, "/%s", cc->cc_id);
+    if (err < 0)
+        return LOG_ERROR_RET(err, "cannot create path to rootfs target directory");
 
+    strncat(cwd, id, 64);
     cc->cc_mnt_root.crfs_target = strndup(cwd, PATH_MAX);
 
     return 0;

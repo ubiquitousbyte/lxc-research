@@ -7,14 +7,20 @@
 #include <sys/ioctl.h>
 #include <linux/nsfs.h>
 
-#define CONTY_NS_PATH_MAX (sizeof("/proc/xxxxxxxxxxxxxxxxxxxx/ns/cgroup"))
+#include "resource.h"
+
+#define CONTY_NS_PATH_MAX (sizeof("/proc/xxxxxxxxxxxxxxxxxxxx/ns/cgroup") - 1)
 
 int conty_ns_open(conty_ns_t ns, pid_t pid)
 {
     int nsfd;
     char path[CONTY_NS_PATH_MAX];
 
-    sprintf(path, "/proc/%d/ns/%s", pid, conty_ns_names[ns]);
+    int err = CONTY_SNPRINTF(path, sizeof(path),
+                             "/proc/%d/ns/%s", pid, conty_ns_names[ns]);
+    if (err < 0)
+        return err;
+
     nsfd = open(path, O_RDONLY | O_CLOEXEC);
     if (nsfd < 0)
         return -errno;

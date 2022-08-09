@@ -140,7 +140,9 @@ int conty_rootfs_mount_devfs(struct conty_rootfs *rootfs)
     int err;
     char buf[PATH_MAX];
 
-    snprintf(buf, sizeof(buf), "%s/dev", rootfs->crfs_target);
+    err = CONTY_SNPRINTF(buf, sizeof(buf), "%s/dev", rootfs->crfs_target);
+    if (err < 0)
+        return LOG_ERROR_RET(err, "failed to create path for devfs");
 
     err = mkdir(buf, 0755);
     if (err != 0 && errno != EEXIST)
@@ -163,7 +165,7 @@ int conty_rootfs_mkdevices(struct conty_rootfs *rootfs)
             "urandom",
             "tty"
     };
-
+    const char *target = rootfs->crfs_target;
     char host_path[PATH_MAX];
     char cont_path[PATH_MAX];
     int err;
@@ -171,12 +173,15 @@ int conty_rootfs_mkdevices(struct conty_rootfs *rootfs)
     for (int i = 0; i < sizeof(devices) / sizeof(devices[0]); i++) {
         __CONTY_CLOSE int fd = -EBADF;
 
-        snprintf(cont_path, PATH_MAX, "%s/dev/%s",
-                 rootfs->crfs_target, devices[i]);
+        err = CONTY_SNPRINTF(cont_path, PATH_MAX, "%s/dev/%s", target, devices[i]);
+        if (err < 0)
+            return LOG_ERROR_RET(err, "failed to create path to device");
 
-        snprintf(host_path, PATH_MAX, "/dev/%s", devices[i]);
+        err = CONTY_SNPRINTF(host_path, PATH_MAX, "/dev/%s", devices[i]);
+        if (err < 0)
+            return LOG_ERROR_RET(err, "failed to create path to host device");
 
-        fd = open(cont_path, O_WRONLY | O_CREAT | O_TRUNC);
+        fd = open(cont_path, O_CREAT | O_CLOEXEC);
         if (fd < 0 && errno != EEXIST)
             return LOG_ERROR_RET(-errno, "cannot open/create device %s: %s", cont_path, strerror(errno));
 

@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "oci.h"
+#include <conty/conty.h>
 
 #include <string.h>
 

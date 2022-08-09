@@ -1,4 +1,4 @@
-#include "oci.h"
+#include <conty/conty.h>
 
 #include <errno.h>
 #include <string.h>
@@ -8,7 +8,7 @@
 
 #include <json.h>
 
-static void oci_namespaces_free(struct oci_namespaces *namespaces)
+void oci_namespaces_free(struct oci_namespaces *namespaces)
 {
     struct oci_namespace *head;
     while (!LIST_EMPTY(namespaces)) {
@@ -23,7 +23,7 @@ static void oci_namespaces_free(struct oci_namespaces *namespaces)
     }
 }
 
-static void oci_devices_free(struct oci_devices *devices)
+void oci_devices_free(struct oci_devices *devices)
 {
     struct oci_device *head;
     while (!LIST_EMPTY(devices)) {
@@ -38,7 +38,7 @@ static void oci_devices_free(struct oci_devices *devices)
     }
 }
 
-static void oci_hooks_free(struct oci_hooks *hooks)
+void oci_hooks_free(struct oci_hooks *hooks)
 {
     struct oci_hook *head;
     while (!LIST_EMPTY(hooks)) {
@@ -53,7 +53,7 @@ static void oci_hooks_free(struct oci_hooks *hooks)
     }
 }
 
-static void oci_process_free(struct oci_process *proc)
+void oci_process_free(struct oci_process *proc)
 {
     if (proc) {
         if (proc->oproc_cwd)
@@ -63,7 +63,7 @@ static void oci_process_free(struct oci_process *proc)
     }
 }
 
-static void oci_uids_free(struct oci_uids *ids)
+void oci_uids_free(struct oci_uids *ids)
 {
     struct oci_id_mapping *head;
     while (!LIST_EMPTY(ids)) {
@@ -483,22 +483,8 @@ static struct oci_conf *__oci_deser_json_conf(json_object *root)
     return CONTY_MOVE_PTR(conf);
 }
 
-static struct oci_conf *oci_deser_json_conf(const char *buf, size_t buf_len)
-{
-    struct oci_conf *conf;
-    json_object *root;
-
-    root = json_tokener_parse(buf);
-    if (!root)
-        return LOG_ERROR_RET(NULL, "oci: invalid json");
-
-    conf = __oci_deser_json_conf(root);
-    json_object_put(root);
-    return conf;
-}
-
-static char *oci_ser_json_process_state(const struct oci_process_state *state,
-                                        size_t *buf_len)
+char *oci_ser_process_state(const struct oci_process_state *state,
+                                 size_t *buf_len)
 {
     char *result = NULL;
     const char *tmp = NULL;
@@ -539,12 +525,79 @@ err_out:
     return LOG_ERROR_RET(NULL, "oci: cannot serialise process state");
 }
 
+struct oci_process_state *oci_deser_json_process_state(json_object *root)
+{
+    __CONTY_FREE struct oci_process_state *state = NULL;
+    json_object *tmp;
+
+    state = calloc(1, sizeof(struct oci_process_state));
+    if (!state)
+        return LOG_FATAL_RET(NULL, "oci: out of memory");
+
+    tmp = json_object_object_get(root, "pid");
+    if (!tmp)
+        return LOG_ERROR_RET(NULL, "oci: process_state invalid pid");
+
+    state->oprocst_sbpid = json_object_get_int(tmp);
+
+    tmp = json_object_object_get(root, "status");
+    if (!tmp)
+        return LOG_ERROR_RET(NULL, "oci: process_state invalid status");
+
+    if (!(state->oprocst_status = oci_deser_json_str(tmp)))
+        return LOG_ERROR_RET(NULL, "oci: process_state invalid status");
+
+    tmp = json_object_object_get(root, "id");
+    if (!tmp)
+        return LOG_ERROR_RET(NULL, "oci: process_state invalid id");
+
+    if (!(state->oprocst_sbid = oci_deser_json_str(tmp)))
+        return LOG_ERROR_RET(NULL, "oci: process_state invalid id");
+
+    tmp = json_object_object_get(root, "bundle");
+    if (!tmp)
+        return LOG_ERROR_RET(NULL, "oci: process_state invalid bundle");
+
+    if (!(state->oprocst_rootfs = oci_deser_json_str(tmp)))
+        return LOG_ERROR_RET(NULL, "oci: process_state invalid bundle");
+
+    return CONTY_MOVE_PTR(state);
+}
+
+struct oci_process_state *oci_deser_process_state(const char *buf)
+{
+    struct oci_process_state *state;
+    json_object *root;
+
+    root = json_tokener_parse(buf);
+    if (!root)
+        return LOG_ERROR_RET(NULL, "oci: invalid json");
+
+    state = oci_deser_json_process_state(root);
+    json_object_put(root);
+    return state;
+}
+
 struct oci_conf *oci_deser_conf(const char *buf)
 {
     struct oci_conf *conf;
     json_object *root;
 
     root = json_tokener_parse(buf);
+    if (!root)
+        return LOG_ERROR_RET(NULL, "oci: invalid json");
+
+    conf = __oci_deser_json_conf(root);
+    json_object_put(root);
+    return conf;
+}
+
+struct oci_conf *oci_deser_conf_file(const char *path)
+{
+    struct oci_conf *conf;
+    json_object *root;
+
+    root = json_object_from_file(path);
     if (!root)
         return LOG_ERROR_RET(NULL, "oci: invalid json");
 

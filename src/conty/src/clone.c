@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/signal.h>
+#include <sys/wait.h>
 #include <sched.h>
 
 #include "resource.h"
@@ -45,4 +46,18 @@ pid_t conty_clone3_cb(int (*fn)(void*), void *arg,
         _exit(fn(arg));
 
     return child;
+}
+
+int conty_clone_wait_exited(pid_t pid, int *status)
+{
+    if (pid < 0)
+        return -1;
+
+    if (waitpid(pid, status, 0) != pid)
+        return -1;
+
+    if (!WIFEXITED(*status) || WEXITSTATUS(*status) != 0)
+        return -1;
+
+    return 0;
 }

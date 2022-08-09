@@ -1,0 +1,49 @@
+{
+  "process": {
+    "args": [
+      "sh",
+      "echo",
+      "lol"
+    ],
+    "cwd": "/bin"
+  },
+  "root": {
+    "path": "/home/nas/alpine-rootfs",
+    "readonly": false
+  },
+  "namespaces": [
+    {
+      "type": "user"
+    },
+    {
+      "type": "net"
+    },
+    {
+      "type": "ipc"
+    },
+    {
+      "type": "mnt"
+    },
+    {
+      "type": "uts"
+    },
+    {
+      "type": "pid"
+    }
+  ],
+  "uid_mappings": [
+    {
+      "sandbox_id": 0,
+      "host_id": 1000,
+      "size": 1
+    }
+  ],
+  "gid_mappings": [
+    {
+      "sandbox_id": 0,
+      "host_id": 1000,
+      "size": 1
+    }
+  ],
+  "hostname": "conty"
+}

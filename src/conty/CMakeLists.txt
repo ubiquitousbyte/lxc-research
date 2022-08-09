@@ -25,13 +25,9 @@ target_sources(conty
         ${CONTY_PRIVATE}/namespace.c
         ${CONTY_PRIVATE}/namespace.h
         ${CONTY_PRIVATE}/hook.c
-        ${CONTY_PRIVATE}/hook.h
         ${CONTY_PRIVATE}/mount.h
         ${CONTY_PRIVATE}/mount.c
-        ${CONTY_PRIVATE}/network.c
-        ${CONTY_PRIVATE}/network.h
         ${CONTY_PRIVATE}/syscall.h
-        ${CONTY_PRIVATE}/queue.h
         ${CONTY_PRIVATE}/user.h
         ${CONTY_PRIVATE}/user.c
         ${CONTY_PRIVATE}/resource.h
@@ -39,12 +35,12 @@ target_sources(conty
         ${CONTY_PRIVATE}/clone.c
         ${CONTY_PRIVATE}/log.h
         ${CONTY_PRIVATE}/log.c
-        ${CONTY_PRIVATE}/oci.h
         ${CONTY_PRIVATE}/oci-json.c
         ${CONTY_PRIVATE}/container.h
         ${CONTY_PRIVATE}/container.c
     PUBLIC
-        ${CONTY_PUBLIC_HDR}/conty.h)
+        ${CONTY_PUBLIC_HDR}/conty.h
+        ${CONTY_PUBLIC_HDR}/queue.h)
 
 target_include_directories(conty
         PUBLIC

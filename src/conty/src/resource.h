@@ -78,4 +78,11 @@ CONTY_CREATE_CLEANUP_FUNC(char **, conty_free_strings);
         __internal_ptr__;                       \
     })
 
+#define CONTY_MOVE_FD(fd) \
+    ({                    \
+        __typeof(fd) __internal_fd__ = (fd); \
+        (fd) = -EBADF;    \
+        __internal_fd__; \
+    })
+
 #endif //CONTY_RESOURCE_H

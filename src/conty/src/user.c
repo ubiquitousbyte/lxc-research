@@ -13,10 +13,10 @@ int conty_id_map_put(struct conty_id_map *map, unsigned int left,
     int err;
 
     size_t n_bytes = snprintf(NULL, 0, "%u %u %u\n", left, right, range);
-    if (map->cim_len + n_bytes > sizeof(map->cim_buf))
+    if (map->cim_len + n_bytes > sizeof(map->cim_buf) - 1)
         return -EIO;
 
-    err = CONTY_SNPRINTF(&map->cim_buf[map->cim_len], n_bytes,
+    err = CONTY_SNPRINTF(&map->cim_buf[map->cim_len], n_bytes + 1,
                          "%u %u %u\n", left, right, range);
     if (err < 0)
         return err;

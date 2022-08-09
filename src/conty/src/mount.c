@@ -138,17 +138,17 @@ int conty_rootfs_mount(const struct conty_rootfs *rootfs)
 int conty_rootfs_mount_devfs(struct conty_rootfs *rootfs)
 {
     int err;
-    char buf[PATH_MAX];
 
-    err = CONTY_SNPRINTF(buf, sizeof(buf), "%s/dev", rootfs->crfs_target);
+    err = CONTY_SNPRINTF(rootfs->crfs_buf, sizeof(rootfs->crfs_buf),
+                         "%s/dev", rootfs->crfs_target);
     if (err < 0)
         return LOG_ERROR_RET(err, "failed to create path for devfs");
 
-    err = mkdir(buf, 0755);
+    err = mkdir(rootfs->crfs_buf, 0755);
     if (err != 0 && errno != EEXIST)
         return LOG_ERROR_RET(-errno, "cannot mkdir dev directory");
 
-    err = mount("none", buf, "tmpfs", 0, "mode=0755,size=500000");
+    err = mount("none", rootfs->crfs_buf, "tmpfs", 0, "mode=0755,size=500000");
     if (err != 0)
         return LOG_ERROR_RET(-errno, "cannot mount devfs");
 
@@ -167,28 +167,68 @@ int conty_rootfs_mkdevices(struct conty_rootfs *rootfs)
     };
     const char *target = rootfs->crfs_target;
     char host_path[PATH_MAX];
-    char cont_path[PATH_MAX];
-    int err;
+    int err = 0;
 
     for (int i = 0; i < sizeof(devices) / sizeof(devices[0]); i++) {
         __CONTY_CLOSE int fd = -EBADF;
 
-        err = CONTY_SNPRINTF(cont_path, PATH_MAX, "%s/dev/%s", target, devices[i]);
+        err = CONTY_SNPRINTF(rootfs->crfs_buf, sizeof(rootfs->crfs_buf),
+                             "%s/dev/%s", target, devices[i]);
         if (err < 0)
             return LOG_ERROR_RET(err, "failed to create path to device");
 
-        err = CONTY_SNPRINTF(host_path, PATH_MAX, "/dev/%s", devices[i]);
+        err = CONTY_SNPRINTF(host_path, sizeof(host_path), "/dev/%s", devices[i]);
         if (err < 0)
             return LOG_ERROR_RET(err, "failed to create path to host device");
 
-        fd = open(cont_path, O_CREAT | O_CLOEXEC);
-        if (fd < 0 && errno != EEXIST)
-            return LOG_ERROR_RET(-errno, "cannot open/create device %s: %s", cont_path, strerror(errno));
+        fd = open(rootfs->crfs_buf, O_CREAT | O_CLOEXEC);
+        if (fd < 0 && errno != EEXIST) {
+            return LOG_ERROR_RET(-errno, "cannot open/create device %s: %s",
+                                 rootfs->crfs_buf, strerror(errno));
+        }
 
-        err = mount(host_path, cont_path, 0, MS_BIND, NULL);
-        if (err != 0)
-            return LOG_ERROR_RET(-errno, "cannot bind mount %s<->%s", host_path, cont_path);
+        err = mount(host_path, rootfs->crfs_buf, 0, MS_BIND, NULL);
+        if (err != 0) {
+            return LOG_ERROR_RET(-errno, "cannot bind mount %s<->%s",
+                                 host_path, rootfs->crfs_buf);
+        }
     }
 
-    return 0;
+    return err;
+}
+
+static int conty_rootfs_mount_pseudofs(struct conty_rootfs *rootfs,
+                                       const char *name, const char *fstype,
+                                       unsigned int flags, mode_t permissions)
+{
+    int err;
+
+    err = CONTY_SNPRINTF(rootfs->crfs_buf, sizeof(rootfs->crfs_buf),
+                         "%s/%s", rootfs->crfs_target, name);
+    if (err < 0)
+        return LOG_ERROR_RET(err, "failed to create path to %s", name);
+
+    err = mkdir(rootfs->crfs_buf, permissions);
+    if (err < 0 && errno != EEXIST)
+        return LOG_ERROR_RET(err, "failed to mkdir %s directory", name);
+
+    err = mount(fstype, rootfs->crfs_buf, fstype, flags, NULL);
+    if (err < 0)
+        return LOG_ERROR_RET(-errno, "failed to mount %s", fstype);
+
+    return err;
+}
+
+int conty_rootfs_mount_procfs(struct conty_rootfs *rootfs)
+{
+    return conty_rootfs_mount_pseudofs(rootfs, "proc", "proc",
+                                       MS_NODEV | MS_NOSUID | MS_NOEXEC,
+                                       0755);
+}
+
+int conty_rootfs_mount_sysfs(struct conty_rootfs *rootfs)
+{
+    return conty_rootfs_mount_pseudofs(rootfs, "sys", "sysfs",
+                                       MS_NODEV | MS_NOSUID | MS_NOEXEC,
+                                       0755);
 }

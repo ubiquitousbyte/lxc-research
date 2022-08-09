@@ -17,6 +17,7 @@ struct conty_rootfs {
     const char *crfs_source;
     const char *crfs_target;
     char        crfs_readonly;
+    char        crfs_buf[PATH_MAX];
 };
 
 int conty_rootfs_mount(const struct conty_rootfs *rootfs);
@@ -27,7 +28,9 @@ int conty_rootfs_mount_devfs(struct conty_rootfs *rootfs);
 
 int conty_rootfs_mkdevices(struct conty_rootfs *rootfs);
 
-int conty_rootfs_mount_procfs(const struct conty_rootfs *rootfs);
+int conty_rootfs_mount_procfs(struct conty_rootfs *rootfs);
+
+int conty_rootfs_mount_sysfs(struct conty_rootfs *rootfs);
 
 #ifdef __cplusplus
 }; // extern "C"

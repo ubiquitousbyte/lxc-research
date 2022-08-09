@@ -92,6 +92,16 @@ static int conty_container_spawner(void *cnt)
 
         if ((err = conty_rootfs_mkdevices(&cc->cc_mnt_root)) != 0)
             return err;
+
+        if (cc->cc_ns_new & CLONE_NEWPID) {
+            if ((err = conty_rootfs_mount_procfs(&cc->cc_mnt_root)) != 0)
+                return err;
+        }
+
+        if (cc->cc_ns_new & CLONE_NEWNET) {
+            if ((err = conty_rootfs_mount_sysfs(&cc->cc_mnt_root)) != 0)
+                return err;
+        }
     }
 
     if (cc->cc_ns_new & CLONE_NEWUTS) {

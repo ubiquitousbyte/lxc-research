@@ -38,6 +38,8 @@ target_sources(conty
         ${CONTY_PRIVATE}/oci-json.c
         ${CONTY_PRIVATE}/container.h
         ${CONTY_PRIVATE}/container.c
+        ${CONTY_PRIVATE}/sync.h
+        ${CONTY_PRIVATE}/sync.c
     PUBLIC
         ${CONTY_PUBLIC_HDR}/conty.h
         ${CONTY_PUBLIC_HDR}/queue.h)

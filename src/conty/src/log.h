@@ -57,7 +57,6 @@ enum {
         __int_ret__;                                            \
     })
 
-
 #define LOG_FATAL_RET(__ret__, fmt, ...)            \
         ({                                                \
             __typeof(__ret__) __internal_ret__ = (__ret__); \

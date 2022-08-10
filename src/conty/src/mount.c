@@ -13,6 +13,32 @@
 #include "syscall.h"
 #include "log.h"
 
+int conty_rootfs_init(struct conty_rootfs *rootfs, const char *cc_id,
+                      char *ocirfs_path, char readonly)
+{
+    int err;
+    char id[64];
+
+    if (!getcwd(rootfs->crfs_buf, PATH_MAX))
+        return LOG_ERROR_RET(-errno, "cannot open current working directory");
+
+    err = CONTY_SNPRINTF(id, 64, "/%s", cc_id);
+    if (err < 0)
+        return LOG_ERROR_RET(err, "cannot create path to rootfs");
+
+    strncat(rootfs->crfs_buf, id, 64);
+
+    err = CONTY_SNPRINTF(rootfs->crfs_target, sizeof(rootfs->crfs_buf),
+                         "%s", rootfs->crfs_buf);
+    if (err < 0)
+        return LOG_ERROR_RET(err, "cannot create path to rootfs");
+
+    rootfs->crfs_source   = ocirfs_path;
+    rootfs->crfs_readonly = readonly;
+
+    return 0;
+}
+
 int conty_rootfs_pivot(const struct conty_rootfs *rootfs)
 {
     __CONTY_CLOSE int old_root = -EBADF, target = -EBADF;

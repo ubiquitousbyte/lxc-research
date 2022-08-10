@@ -6,6 +6,46 @@
 #include "log.h"
 #include "clone.h"
 #include "resource.h"
+#include "syscall.h"
+
+#define CONTY_SYNC_RTFD 0
+#define CONTY_SYNC_CFD  1
+
+typedef enum {
+    CONTY_SYNC_RT_CREATED,
+    CONTY_SYNC_CONTAINER_CREATED,
+} conty_sync_event_t ;
+
+static int conty_container_sync_tx(int fd, conty_sync_event_t event)
+{
+    int e = event;
+    if (write(fd, &e, sizeof(int)) != sizeof(int))
+        return LOG_ERROR_RET(-1, "could not sync runtime and container");
+    return 0;
+}
+
+static int conty_container_sync_rx(int fd, conty_sync_event_t event)
+{
+    int e;
+    if (read(fd, &e, sizeof(int)) != sizeof(int))
+        return LOG_ERROR_RET(-1, "could not sync runtime and container");
+    if (e != event)
+        return LOG_ERROR_RET(-1, "expected rx event %d but got %d", event, e);
+    return 0;
+}
+
+static int conty_container_exec_hook(const struct conty_container *cc,
+                                     const struct oci_hook *hook)
+{
+    int err;
+    struct oci_process_state state;
+
+    conty_container_get_state(cc, &state);
+    if ((err = conty_oci_hook_exec(hook, &state)) != 0)
+        return LOG_ERROR_RET(err, "event hook failed: %s", hook->oh_path);
+
+    return err;
+}
 
 static int conty_container_init_ns(struct conty_container *cc)
 {
@@ -52,7 +92,7 @@ static int conty_container_rootfs_init(struct conty_container *cc)
     char id[64];
     struct oci_rootfs *oci_rfs = &cc->cc_oci_conf->oc_rootfs;
 
-    cc->cc_mnt_root.crfs_source = oci_rfs->ocirfs_path;
+    cc->cc_mnt_root.crfs_source = CONTY_MOVE_PTR(oci_rfs->ocirfs_path);
     if (!getcwd(cwd, PATH_MAX))
         return LOG_ERROR_RET(-errno, "cannot open cwd");
 
@@ -69,8 +109,20 @@ static int conty_container_rootfs_init(struct conty_container *cc)
 static int conty_container_spawner(void *cnt)
 {
     int err;
-    struct conty_container *cc = (struct conty_container *) cnt;
-    struct oci_conf *conf = cc->cc_oci_conf;
+    CONTY_INVOKE_CLEANER(conty_container_free) struct conty_container *cc = NULL;
+    struct oci_conf *conf = NULL;
+    __CONTY_CLOSE int sync_fd = -EBADF;
+    struct oci_hook *cur, *tmp;
+
+    cc         = (struct conty_container *) cnt;
+    cc->cc_pid = conty_getpid();
+    conf       = cc->cc_oci_conf;
+
+    sync_fd = CONTY_MOVE_FD(cc->cc_syncfds[CONTY_SYNC_CFD]);
+    close(cc->cc_syncfds[CONTY_SYNC_RTFD]);
+
+    if (conty_container_sync_tx(sync_fd, CONTY_SYNC_RT_CREATED) != 0)
+        return -1;
 
     if (cc->cc_ns_new & CLONE_NEWUSER) {
         if ((err = conty_oci_write_uid_map(&conf->oc_uids)) != 0)
@@ -109,6 +161,14 @@ static int conty_container_spawner(void *cnt)
             return -1;
     }
 
+    if (conty_container_sync_rx(sync_fd, CONTY_SYNC_CONTAINER_CREATED) != 0)
+        return -1;
+
+    LIST_FOREACH_SAFE(cur, &conf->oc_hooks.oeh_sb_created, oh_next, tmp) {
+        if (conty_container_exec_hook(cc, cur) != 0)
+            return -1;
+    }
+
     conty_rootfs_pivot(&cc->cc_mnt_root);
 
     return 0;
@@ -142,6 +202,8 @@ struct conty_container* conty_container_new(const char *cc_id, const char *path)
 {
     CONTY_INVOKE_CLEANER(conty_container_free) struct conty_container *cc = NULL;
     CONTY_INVOKE_CLEANER(oci_conf_free) struct oci_conf *conf = NULL;
+    __CONTY_CLOSE int sync_fd = -EBADF;
+    struct oci_hook *cur, *tmp;
 
     conf = oci_deser_conf_file(path);
     if (!conf)
@@ -149,11 +211,14 @@ struct conty_container* conty_container_new(const char *cc_id, const char *path)
 
     cc = calloc(1, sizeof(struct conty_container));
     if (!cc)
-        return LOG_ERROR_RET_ERRNO(NULL, errno, "conty_container: out of memory");
+        return LOG_ERROR_RET_ERRNO(NULL, errno, "out of memory");
 
-    cc->cc_id       = cc_id;
-    cc->cc_status   = CONTAINER_CREATING;
-    cc->cc_oci_conf = CONTY_MOVE_PTR(conf);
+    cc->cc_syncfds[CONTY_SYNC_CFD]  = -EBADF;
+    cc->cc_syncfds[CONTY_SYNC_RTFD] = -EBADF;
+    cc->cc_pollfd                   = -EBADF;
+    cc->cc_id                       =  cc_id;
+    cc->cc_oci_status               =  CONTAINER_CREATING;
+    cc->cc_oci_conf                 =  CONTY_MOVE_PTR(conf);
 
     if (conty_container_init_ns(cc) != 0)
         return NULL;
@@ -162,7 +227,10 @@ struct conty_container* conty_container_new(const char *cc_id, const char *path)
         return NULL;
 
     if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, cc->cc_syncfds) != 0)
-        return LOG_ERROR_RET(NULL, "cannot create sync sockpair");
+        return LOG_ERROR_RET(NULL, "cannot create ipc socket pair");
+
+    sync_fd = CONTY_MOVE_FD(cc->cc_syncfds[CONTY_SYNC_RTFD]);
+    close(cc->cc_syncfds[CONTY_SYNC_CFD]);
 
     if (cc->cc_ns_has_fds) {
         pid_t joiner_pid;
@@ -180,13 +248,44 @@ struct conty_container* conty_container_new(const char *cc_id, const char *path)
             return LOG_ERROR_RET(NULL, "cannot create runtime process");
     }
 
+    if (conty_container_sync_rx(sync_fd, CONTY_SYNC_RT_CREATED) != 0)
+        return NULL;
+
+    LIST_FOREACH_SAFE(cur, &conf->oc_hooks.oeh_rt_create, oh_next, tmp) {
+        if (conty_container_exec_hook(cc, cur) != 0)
+            return NULL;
+    }
+
+    if (conty_container_sync_tx(sync_fd, CONTY_SYNC_CONTAINER_CREATED) != 0)
+        return NULL;
+
     return CONTY_MOVE_PTR(cc);
+}
+
+void conty_container_get_state(const struct conty_container *cc,
+                               struct oci_process_state *state)
+{
+    state->oprocst_status = oci_container_statuses[cc->cc_oci_status];
+    state->oprocst_rootfs = cc->cc_mnt_root.crfs_target;
+    state->oprocst_sbid   = cc->cc_id;
+    state->oprocst_sbpid  = cc->cc_pid;
 }
 
 void conty_container_free(struct conty_container *cc)
 {
     if (cc) {
+        if (cc->cc_syncfds[CONTY_SYNC_CFD] >= 0)
+            close(cc->cc_syncfds[CONTY_SYNC_CFD]);
+        if (cc->cc_syncfds[CONTY_SYNC_RTFD] >= 0)
+            close(cc->cc_syncfds[CONTY_SYNC_RTFD]);
+        if (cc->cc_pollfd >= 0)
+            close(cc->cc_pollfd);
         if (cc->cc_oci_conf)
             oci_conf_free(cc->cc_oci_conf);
+        if (cc->cc_mnt_root.crfs_target)
+            free(cc->cc_mnt_root.crfs_target);
+        if (cc->cc_mnt_root.crfs_source)
+            free(cc->cc_mnt_root.crfs_source);
+        free(cc);
     }
 }

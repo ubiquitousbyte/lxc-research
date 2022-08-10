@@ -15,7 +15,7 @@ struct conty_container {
     pid_t                  cc_pid;
     int                    cc_pollfd;
     int                    cc_syncfds[2];
-    oci_container_status_t cc_status;
+    oci_container_status_t cc_oci_status;
 
 
     /* Namespace state bookkeeping */
@@ -27,13 +27,15 @@ struct conty_container {
 
     /* Mount namespace configuration */
     struct {
-        struct conty_rootfs   cc_mnt_root;
+        struct conty_rootfs cc_mnt_root;
     };
 
     struct oci_conf *cc_oci_conf;
 };
 
-struct conty_container* conty_container_new(const char *cc_id, const char *path);
+struct conty_container *conty_container_new(const char *cc_id, const char *path);
+void conty_container_get_state(const struct conty_container *cc,
+                               struct oci_process_state *state);
 
 void conty_container_free(struct conty_container *cc);
 

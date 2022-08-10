@@ -29,6 +29,7 @@ struct conty_container {
 
 struct conty_container *conty_container_new(const char *cc_id, const char *path);
 int conty_container_start(struct conty_container *cc);
+int conty_container_kill(struct conty_container *cc, int sig);
 
 void conty_container_free(struct conty_container *cc);
 

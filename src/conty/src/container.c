@@ -13,7 +13,6 @@ static int conty_container_run(void *container);
 static int conty_container_join(void *cnt);
 static int conty_container_spawn(struct conty_container *cc);
 static int conty_container_init_namespaces_parent(struct conty_container *cc);
-static void conty_container_init_child(struct conty_container *cc);
 static int conty_container_exec_hooks(const struct conty_container *cc, int event);
 
 struct conty_container* conty_container_new(const char *cc_id, const char *path)
@@ -60,6 +59,8 @@ struct conty_container* conty_container_new(const char *cc_id, const char *path)
     if (err != 0)
         goto reap_and_exit;
 
+    cc->cc_oci_status = CONTAINER_CREATED;
+
     return CONTY_MOVE_PTR(cc);
 
 notify_err:
@@ -80,6 +81,13 @@ int conty_container_start(struct conty_container *cc)
     if (err != 0)
         return err;
 
+    return 0;
+}
+
+int conty_container_kill(struct conty_container *cc, int sig)
+{
+    if (conty_pidfd_send_signal(cc->cc_pollfd, sig, NULL, 0) != 0)
+        return LOG_ERROR_RET(-errno, "cannot kill container %s", cc->cc_id);
     return 0;
 }
 
@@ -116,8 +124,6 @@ static int conty_container_run(void *container)
 
     close(cc->cc_pollfd);
     cc->cc_pollfd = -EBADF;
-
-    conty_container_init_child(cc);
 
     if (conty_sync_child_wake(cc->cc_syncfds, SYNC_RUNTIME_CREATE) != 0)
         return -1;
@@ -186,6 +192,7 @@ static int conty_container_run(void *container)
     if (err != 0)
         return -1;
 
+    return 0;
 sync_err:
     conty_sync_child_wake(cc->cc_syncfds, SYNC_ERROR);
     return err;
@@ -213,13 +220,6 @@ static int conty_container_join(void *cnt)
         return LOG_ERROR_RET(-1, "cannot spawn runtime");
 
     return 0;
-}
-
-static void conty_container_init_child(struct conty_container *cc)
-{
-    conty_sync_child_init(cc->cc_syncfds);
-    close(cc->cc_pollfd);
-    cc->cc_pollfd = -EBADF;
 }
 
 static int conty_container_exec_hooks(const struct conty_container *cc, int event)

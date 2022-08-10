@@ -56,8 +56,10 @@ int conty_clone_wait_exited(pid_t pid, int *status)
     if (waitpid(pid, status, 0) != pid)
         return -1;
 
-    if (!WIFEXITED(*status) || WEXITSTATUS(*status) != 0)
-        return -1;
+    if (status) {
+        if (!WIFEXITED(*status) || WEXITSTATUS(*status) != 0)
+            return -1;
+    }
 
     return 0;
 }

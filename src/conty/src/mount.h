@@ -14,10 +14,10 @@ extern "C" {
 #endif
 
 struct conty_rootfs {
-    const char *crfs_source;
-    const char *crfs_target;
-    char        crfs_readonly;
-    char        crfs_buf[PATH_MAX];
+    char *crfs_source;
+    char *crfs_target;
+    char  crfs_readonly;
+    char  crfs_buf[PATH_MAX];
 };
 
 int conty_rootfs_mount(const struct conty_rootfs *rootfs);

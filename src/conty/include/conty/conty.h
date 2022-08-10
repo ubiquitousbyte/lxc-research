@@ -21,6 +21,7 @@ struct oci_namespace {
     char                     *ons_path;
     LIST_ENTRY(oci_namespace) ons_next;
 };
+void oci_namespace_free(struct oci_namespace *ns);
 
 struct oci_id_mapping {
     unsigned int               oid_container;
@@ -39,24 +40,28 @@ struct oci_device {
     unsigned int            odev_gowner;
     LIST_ENTRY(oci_device)  odev_next;
 };
+void oci_device_free(struct oci_device *dev);
 
 struct oci_rootfs {
     char *ocirfs_path;
     char  ocirfs_ro;
 };
+void oci_rootfs_free(struct oci_rootfs *rootfs);
 
 struct oci_process {
     char  *oproc_cwd;
     char **oproc_argv;
     char **oproc_envp;
 };
+void oci_process_free(struct oci_process *process);
 
 struct oci_process_state {
-    pid_t       oprocst_sbpid;
-    const char *oprocst_sbid;
-    const char *oprocst_rootfs;
-    const char *oprocst_status;
+    pid_t  oprocst_container_pid;
+    char  *oprocst_container_id;
+    char  *oprocst_rootfs;
+    char  *oprocst_status;
 };
+void oci_process_state_free(struct oci_process_state *state);
 
 struct oci_hook {
     char                 *oh_path;
@@ -65,6 +70,7 @@ struct oci_hook {
     unsigned int          oh_timeout;
     LIST_ENTRY(oci_hook)  oh_next;
 };
+void oci_hook_free(struct oci_hook *hook);
 
 LIST_HEAD(oci_namespaces, oci_namespace);
 LIST_HEAD(oci_uids, oci_id_mapping);
@@ -72,11 +78,11 @@ LIST_HEAD(oci_devices, oci_device);
 LIST_HEAD(oci_hooks, oci_hook);
 
 struct oci_event_hooks {
-    struct oci_hooks oeh_rt_create;
-    struct oci_hooks oeh_sb_created;
-    struct oci_hooks oeh_sb_start;
-    struct oci_hooks oeh_sb_started;
-    struct oci_hooks oeh_sb_stopped;
+    struct oci_hooks oeh_on_runtime_create;
+    struct oci_hooks oeh_on_container_created;
+    struct oci_hooks oeh_on_container_start;
+    struct oci_hooks oeh_on_container_started;
+    struct oci_hooks oeh_on_container_stopped;
 };
 
 struct oci_conf {

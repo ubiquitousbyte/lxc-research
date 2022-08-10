@@ -8,48 +8,37 @@
 
 #include <json.h>
 
-void oci_namespaces_free(struct oci_namespaces *namespaces)
+void oci_namespace_free(struct oci_namespace *ns)
 {
-    struct oci_namespace *head;
-    while (!LIST_EMPTY(namespaces)) {
-        head = LIST_FIRST(namespaces);
-        LIST_REMOVE(head, ons_next);
-        if (head->ons_type)
-            free(head->ons_type);
-        if (head->ons_path)
-            free(head->ons_path);
-        free(head);
-        head = NULL;
+    if (ns) {
+        if (ns->ons_type)
+            free(ns->ons_type);
+        if (ns->ons_path)
+            free(ns->ons_path);
+        free(ns);
+        ns = NULL;
     }
 }
 
-void oci_devices_free(struct oci_devices *devices)
+void oci_device_free(struct oci_device *dev)
 {
-    struct oci_device *head;
-    while (!LIST_EMPTY(devices)) {
-        head = LIST_FIRST(devices);
-        LIST_REMOVE(head, odev_next);
-        if (head->odev_path)
-            free(head->odev_path);
-        if (head->odev_type)
-            free(head->odev_type);
-        free(head);
-        head = NULL;
+    if (dev) {
+        if (dev->odev_path)
+            free(dev->odev_path);
+        if (dev->odev_type)
+            free(dev->odev_type);
+        free(dev);
+        dev = NULL;
     }
 }
 
-void oci_hooks_free(struct oci_hooks *hooks)
+void oci_rootfs_free(struct oci_rootfs *rootfs)
 {
-    struct oci_hook *head;
-    while (!LIST_EMPTY(hooks)) {
-        head = LIST_FIRST(hooks);
-        LIST_REMOVE(head, oh_next);
-        if (head->oh_path)
-            free(head->oh_path);
-        conty_free_strings(head->oh_argv);
-        conty_free_strings(head->oh_envp);
-        free(head);
-        head = NULL;
+    if (rootfs) {
+        if (rootfs->ocirfs_path)
+            free(rootfs->ocirfs_path);
+        free(rootfs);
+        rootfs = NULL;
     }
 }
 
@@ -60,17 +49,34 @@ void oci_process_free(struct oci_process *proc)
             free(proc->oproc_cwd);
         conty_free_strings(proc->oproc_argv);
         conty_free_strings(proc->oproc_envp);
+        free(proc);
+        proc = NULL;
     }
 }
 
-void oci_uids_free(struct oci_uids *ids)
+void oci_process_state_free(struct oci_process_state *state)
 {
-    struct oci_id_mapping *head;
-    while (!LIST_EMPTY(ids)) {
-        head = LIST_FIRST(ids);
-        LIST_REMOVE(head, oid_next);
-        free(head);
-        head = NULL;
+    if (state) {
+        if (state->oprocst_rootfs)
+            free(state->oprocst_rootfs);
+        if (state->oprocst_container_id)
+            free(state->oprocst_container_id);
+        if (state->oprocst_status)
+            free(state->oprocst_status);
+        free(state);
+        state = NULL;
+    }
+}
+
+void oci_hook_free(struct oci_hook *hook)
+{
+    if (hook) {
+        if (hook->oh_path)
+            free(hook->oh_path);
+        conty_free_strings(hook->oh_argv);
+        conty_free_strings(hook->oh_envp);
+        free(hook);
+        hook = NULL;
     }
 }
 
@@ -80,19 +86,24 @@ void oci_conf_free(struct oci_conf *conf)
         if (conf->oc_rootfs.ocirfs_path)
             free(conf->oc_rootfs.ocirfs_path);
 
+        if (conf->oc_proc.oproc_cwd)
+            free(conf->oc_proc.oproc_cwd);
+        conty_free_strings(conf->oc_proc.oproc_argv);
+        conty_free_strings(conf->oc_proc.oproc_envp);
+
         if (conf->oc_hostname)
             free(conf->oc_hostname);
 
-        oci_namespaces_free(&conf->oc_namespaces);
-        oci_devices_free(&conf->oc_devices);
-        oci_hooks_free(&conf->oc_hooks.oeh_rt_create);
-        oci_hooks_free(&conf->oc_hooks.oeh_sb_created);
-        oci_hooks_free(&conf->oc_hooks.oeh_sb_start);
-        oci_hooks_free(&conf->oc_hooks.oeh_sb_started);
-        oci_hooks_free(&conf->oc_hooks.oeh_sb_stopped);
-        oci_uids_free(&conf->oc_uids);
-        oci_uids_free(&conf->oc_gids);
-        oci_process_free(&conf->oc_proc);
+        CONTY_LIST_CLEAN(&conf->oc_namespaces, ons_next, oci_namespace_free);
+        CONTY_LIST_CLEAN(&conf->oc_devices, odev_next, oci_device_free);
+        CONTY_LIST_CLEAN(&conf->oc_hooks.oeh_on_runtime_create, oh_next, oci_hook_free);
+        CONTY_LIST_CLEAN(&conf->oc_hooks.oeh_on_container_created, oh_next, oci_hook_free);
+        CONTY_LIST_CLEAN(&conf->oc_hooks.oeh_on_container_start, oh_next, oci_hook_free);
+        CONTY_LIST_CLEAN(&conf->oc_hooks.oeh_on_container_started, oh_next, oci_hook_free);
+        CONTY_LIST_CLEAN(&conf->oc_hooks.oeh_on_container_stopped, oh_next, oci_hook_free);
+        CONTY_LIST_CLEAN(&conf->oc_uids, oid_next, CONTY_MEM_CLEANER);
+        CONTY_LIST_CLEAN(&conf->oc_gids, oid_next, CONTY_MEM_CLEANER);
+
         free(conf);
     }
 }
@@ -372,11 +383,11 @@ static int oci_deser_json_event_hooks(json_object *root,
         const char *name;
         struct oci_hooks *hooks;
     } helper[] = {
-            { .name = "on_runtime_create",  .hooks = &hooks->oeh_rt_create },
-            { .name = "on_sandbox_created", .hooks = &hooks->oeh_sb_created },
-            { .name = "on_sandbox_start",   .hooks = &hooks->oeh_sb_start },
-            { .name = "on_sandbox_started", .hooks = &hooks->oeh_sb_started },
-            { .name = "on_sandbox_stopped", .hooks = &hooks->oeh_sb_stopped },
+            { .name = "on_runtime_create",  .hooks = &hooks->oeh_on_runtime_create },
+            { .name = "on_sandbox_created", .hooks = &hooks->oeh_on_container_created },
+            { .name = "on_sandbox_start",   .hooks = &hooks->oeh_on_container_start },
+            { .name = "on_sandbox_started", .hooks = &hooks->oeh_on_container_started },
+            { .name = "on_sandbox_stopped", .hooks = &hooks->oeh_on_container_stopped },
     };
 
     for (int i = 0; i < 5; i++) {
@@ -495,12 +506,12 @@ char *oci_ser_process_state(const struct oci_process_state *state,
         return LOG_FATAL_RET(NULL, "oci: out of memory");
 
     err = json_object_object_add(root, "pid",
-                                 json_object_new_int64(state->oprocst_sbpid));
+                                 json_object_new_int64(state->oprocst_container_pid));
     if (err != 0)
         goto err_out;
 
     err = json_object_object_add(root, "id",
-                                 json_object_new_string(state->oprocst_sbid));
+                                 json_object_new_string(state->oprocst_container_id));
     if (err != 0)
         goto err_out;
 
@@ -525,9 +536,10 @@ err_out:
     return LOG_ERROR_RET(NULL, "oci: cannot serialise process state");
 }
 
+CONTY_CREATE_CLEANUP_FUNC(struct oci_process_state *, oci_process_state_free);
 struct oci_process_state *oci_deser_json_process_state(json_object *root)
 {
-    __CONTY_FREE struct oci_process_state *state = NULL;
+    CONTY_INVOKE_CLEANER(oci_process_state_free) struct oci_process_state *state = NULL;
     json_object *tmp;
 
     state = calloc(1, sizeof(struct oci_process_state));
@@ -538,7 +550,7 @@ struct oci_process_state *oci_deser_json_process_state(json_object *root)
     if (!tmp)
         return LOG_ERROR_RET(NULL, "oci: process_state invalid pid");
 
-    state->oprocst_sbpid = json_object_get_int(tmp);
+    state->oprocst_container_pid = json_object_get_int(tmp);
 
     tmp = json_object_object_get(root, "status");
     if (!tmp)
@@ -551,7 +563,7 @@ struct oci_process_state *oci_deser_json_process_state(json_object *root)
     if (!tmp)
         return LOG_ERROR_RET(NULL, "oci: process_state invalid id");
 
-    if (!(state->oprocst_sbid = oci_deser_json_str(tmp)))
+    if (!(state->oprocst_container_id = oci_deser_json_str(tmp)))
         return LOG_ERROR_RET(NULL, "oci: process_state invalid id");
 
     tmp = json_object_object_get(root, "bundle");

@@ -15,7 +15,7 @@ static int conty_container_spawn(struct conty_container *cc);
 static int conty_container_init_namespaces_parent(struct conty_container *cc);
 static int conty_container_exec_hooks(const struct conty_container *cc, int event);
 
-struct conty_container* conty_container_new(const char *cc_id, const char *path)
+struct conty_container *conty_container_new(const char *cc_id, const char *path)
 {
     int err;
     CONTY_INVOKE_CLEANER(conty_container_free) struct conty_container *cc = NULL;
@@ -80,6 +80,8 @@ int conty_container_start(struct conty_container *cc)
                                SYNC_CONTAINER_STARTED);
     if (err != 0)
         return err;
+
+    cc->cc_oci_status = CONTAINER_RUNNING;
 
     return 0;
 }

@@ -94,4 +94,21 @@ CONTY_CREATE_CLEANUP_FUNC(char **, conty_free_strings);
         __ret__snprintf;                                                          \
     })
 
+#define CONTY_LIST_CLEAN(list, el_field, cleaner) do { \
+     __typeof((list)->lh_first) __tmp_el__ = NULL;     \
+     while (!LIST_EMPTY(list)) {                       \
+         __tmp_el__ = LIST_FIRST(list);                \
+         LIST_REMOVE(__tmp_el__, el_field);            \
+         cleaner(__tmp_el__);                          \
+     }                                                 \
+} while (0)
+
+#define CONTY_MOVE_LIST_HEAD(list) \
+    ({                            \
+        __typeof(list) __tmp__list;    \
+        LIST_INIT(&(__tmp__list));        \
+        __tmp__list.lh_first = CONTY_MOVE_PTR((list).lh_first); \
+        __tmp__list;                               \
+    })
+
 #endif //CONTY_RESOURCE_H

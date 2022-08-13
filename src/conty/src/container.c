@@ -1,7 +1,6 @@
 #include "container.h"
 
 #include <fcntl.h>
-#include <sys/socket.h>
 
 #include "log.h"
 #include "clone.h"
@@ -12,6 +11,8 @@
 static int conty_container_run(void *container);
 static int conty_container_join(void *cnt);
 static int conty_container_spawn(struct conty_container *cc);
+static int conty_container_init(struct conty_container *cc, const char *cc_id,
+                                struct oci_conf *conf);
 static int conty_container_init_namespaces_parent(struct conty_container *cc);
 static int conty_container_exec_hooks(const struct conty_container *cc, int event);
 
@@ -28,14 +29,7 @@ struct conty_container *conty_container_new(const char *cc_id, const char *path)
     if (!(conf = oci_deser_conf_file(path)))
         return NULL;
 
-    cc->cc_syncfds[CONTY_SYNC_CFD]  = -EBADF;
-    cc->cc_syncfds[CONTY_SYNC_RTFD] = -EBADF;
-    cc->cc_pollfd                   = -EBADF;
-    cc->cc_id                       =  cc_id;
-    cc->cc_oci_status               =  CONTAINER_CREATING;
-    cc->cc_oci                      =  CONTY_MOVE_PTR(conf);
-
-    if (conty_container_init_namespaces_parent(cc) != 0)
+    if (conty_container_init(cc, cc_id, conf) != 0)
         return NULL;
 
     if (conty_sync_init(cc->cc_syncfds) != 0)
@@ -54,8 +48,7 @@ struct conty_container *conty_container_new(const char *cc_id, const char *path)
     if (err != 0)
         goto notify_err;
 
-    err = conty_sync_parent_tx(cc->cc_syncfds, SYNC_CONTAINER_CREATE,
-                               SYNC_CONTAINER_CREATED);
+    err = conty_sync_parent_tx(cc->cc_syncfds, SYNC_CONTAINER_CREATE, SYNC_CONTAINER_CREATED);
     if (err != 0)
         goto reap_and_exit;
 
@@ -76,10 +69,9 @@ int conty_container_start(struct conty_container *cc)
     if (cc->cc_oci_status != CONTAINER_CREATED)
         return -1;
 
-    err = conty_sync_parent_tx(cc->cc_syncfds, SYNC_CONTAINER_START,
-                               SYNC_CONTAINER_STARTED);
+    err = conty_sync_parent_wake(cc->cc_syncfds, SYNC_CONTAINER_START);
     if (err != 0)
-        return err;
+        return -1;
 
     cc->cc_oci_status = CONTAINER_RUNNING;
 
@@ -89,7 +81,7 @@ int conty_container_start(struct conty_container *cc)
 int conty_container_kill(struct conty_container *cc, int sig)
 {
     if (conty_pidfd_send_signal(cc->cc_pollfd, sig, NULL, 0) != 0)
-        return LOG_ERROR_RET(-errno, "cannot kill container %s", cc->cc_id);
+        return LOG_ERROR_RET(-errno, "cannot kill container %s : %s", cc->cc_id, strerror(errno));
     return 0;
 }
 
@@ -97,7 +89,7 @@ static int conty_container_spawn(struct conty_container *cc)
 {
     if (!cc->cc_ns_has_fds) {
         cc->cc_pid = conty_clone3_cb(conty_container_run, cc,
-                                     cc->cc_ns_new, &cc->cc_pollfd);
+                                     cc->cc_ns_new | CLONE_PIDFD, &cc->cc_pollfd);
         if (cc->cc_pid < 0)
             return LOG_ERROR_RET(-1, "cannot create runtime process");
     } else {
@@ -119,13 +111,12 @@ static int conty_container_run(void *container)
     CONTY_INVOKE_CLEANER(conty_container_free) struct conty_container *cc = NULL;
     int err;
     struct conty_rootfs rootfs;
+    struct oci_process *proc;
 
     cc = (struct conty_container *) container;
+    proc = &cc->cc_oci->oc_proc;
 
     conty_sync_child_init(cc->cc_syncfds);
-
-    close(cc->cc_pollfd);
-    cc->cc_pollfd = -EBADF;
 
     if (conty_sync_child_wake(cc->cc_syncfds, SYNC_RUNTIME_CREATE) != 0)
         return -1;
@@ -180,21 +171,19 @@ static int conty_container_run(void *container)
             goto sync_err;
     }
 
-    err = conty_sync_child_tx(cc->cc_syncfds, SYNC_CONTAINER_CREATED,
-                              SYNC_CONTAINER_START);
+    err = conty_sync_child_tx(cc->cc_syncfds, SYNC_CONTAINER_CREATED, SYNC_CONTAINER_START);
     if (err != 0)
         return -1;
 
     if ((err = conty_container_exec_hooks(cc, SYNC_CONTAINER_START)) != 0)
         goto sync_err;
 
-    // TODO: Execute process
+    if (chdir(proc->oproc_cwd) != 0)
+        goto sync_err;
 
-    err = conty_sync_child_wake(cc->cc_syncfds, SYNC_CONTAINER_STARTED);
-    if (err != 0)
-        return -1;
+    err = execve(proc->oproc_argv[0], proc->oproc_argv, proc->oproc_envp);
+    LOG_ERROR("Failed to execute application %s", proc->oproc_argv[0]);
 
-    return 0;
 sync_err:
     conty_sync_child_wake(cc->cc_syncfds, SYNC_ERROR);
     return err;
@@ -246,6 +235,19 @@ static int conty_container_exec_hooks(const struct conty_container *cc, int even
     }
 
     return 0;
+}
+
+static int conty_container_init(struct conty_container *cc, const char *cc_id,
+                                struct oci_conf *conf)
+{
+    cc->cc_syncfds[CONTY_SYNC_CFD]  = -EBADF;
+    cc->cc_syncfds[CONTY_SYNC_RTFD] = -EBADF;
+    cc->cc_pollfd                   = -EBADF;
+    cc->cc_id                       =  cc_id;
+    cc->cc_oci_status               =  CONTAINER_CREATING;
+    cc->cc_oci                      =  CONTY_MOVE_PTR(conf);
+
+    return conty_container_init_namespaces_parent(cc);
 }
 
 static int conty_container_init_namespaces_parent(struct conty_container *cc)

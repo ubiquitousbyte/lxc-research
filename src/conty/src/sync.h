@@ -10,16 +10,21 @@
 #include "log.h"
 
 enum {
+    /* Child or parent failed with an error condition */
     SYNC_ERROR,
+    /* Request the creation of a runtime environment from the runtime */
     SYNC_RUNTIME_CREATE,
+    /* Acknowledge the creation of a runtime environment by the runtime */
     SYNC_RUNTIME_CREATED,
+    /* Request the creation of a container environment from the container */
     SYNC_CONTAINER_CREATE,
+    /* Acknowledge the creation of a container environment by the container */
     SYNC_CONTAINER_CREATED,
+    /* Request execution of the user-defined application by the container */
     SYNC_CONTAINER_START,
+    /* Acknowledge that the user-defined application was executed */
     SYNC_CONTAINER_STARTED,
 };
-
-
 
 #define CONTY_SYNC_MAX (SYNC_CONTAINER_STARTED + 1)
 #define CONTY_SYNC_CFD 0

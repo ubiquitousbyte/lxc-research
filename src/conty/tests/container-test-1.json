@@ -1,9 +1,8 @@
 {
   "process": {
     "args": [
-      "sh",
-      "echo",
-      "lol"
+      "sleep",
+      "120"
     ],
     "cwd": "/bin"
   },

@@ -197,12 +197,10 @@ static int container_entrypoint(void *arg)
          */
         struct oci_rootfs *oci_root = &conf->oc_rootfs;
 
-        err = conty_rootfs_init(&rootfs, oci_root->orfs_path, oci_root->orfs_readonly);
-        if (err != 0)
+        if (conty_rootfs_init(&rootfs, oci_root->orfs_path, oci_root->orfs_readonly) != 0)
             goto err_notify_runtime;
 
-        err = conty_rootfs_mount(&rootfs);
-        if (err != 0)
+        if (conty_rootfs_mount(&rootfs) != 0)
             goto err_notify_runtime;
 
         /*
@@ -210,16 +208,13 @@ static int container_entrypoint(void *arg)
          * This includes /dev/shm and /dev/mqueue to ensure that
          * container applications can use the POSIX IPC APIs
          */
-        err = conty_rootfs_mount_dev(&rootfs);
-        if (err != 0)
+        if (conty_rootfs_mount_dev(&rootfs) != 0)
             goto err_notify_runtime;
 
-        err = conty_rootfs_mount_shm(&rootfs);
-        if (err != 0)
+        if (conty_rootfs_mount_shm(&rootfs) != 0)
             goto err_notify_runtime;
 
-        err = conty_rootfs_mount_mqueue(&rootfs);
-        if (err != 0)
+        if (conty_rootfs_mount_mqueue(&rootfs) != 0)
             goto err_notify_runtime;
 
         /*
@@ -231,8 +226,7 @@ static int container_entrypoint(void *arg)
          * If we can't create isolated device nodes, we'll fall back to
          * bind mounting the nodes resident on the host system
          */
-        err = conty_rootfs_mkdev(&rootfs);
-        if (err != 0)
+        if (conty_rootfs_mkdev(&rootfs) != 0)
             goto err_notify_runtime;
 
         if (cc->cc_ns_new & CLONE_NEWPID) {
@@ -326,7 +320,7 @@ static int ns_sharer(void *arg)
         if (nsfd >= 0 && (conty_ns_set(nsfd, 0) < 0))
             return log_error_ret(-1, "cannot join namespace");
     }
- 
+
     /*
      * We set the CLONE_PARENT flag to ensure that the runtime becomes
      * the parent process of the container, and not this intermediate process

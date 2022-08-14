@@ -8,6 +8,8 @@
 #include "namespace.h"
 #include "oci.h"
 
+#define CONTY_STATUS_MAX (CONTY_STOPPED)
+
 struct conty_container {
     /*
      * Container identifier
@@ -50,39 +52,10 @@ struct conty_container {
     struct oci_conf *cc_conf;
 };
 
-static inline int conty_container_pollfd(const struct conty_container *cc)
-{
-    return cc->cc_pollfd;
-}
-
-static inline void conty_container_set_status(struct conty_container *cc,
-                                              conty_container_status_t status)
-{
-    cc->cc_status = status;
-}
-
-static inline conty_container_status_t conty_container_status(const struct conty_container *container)
-{
-    return container->cc_status;
-}
-
-static inline const char *conty_container_status_str(const struct conty_container *container)
-{
-    static const char *status_str[CONTY_STATUS_MAX + 1] = {
-            [CONTY_CREATING] = "creating",
-            [CONTY_CREATED]  = "created",
-            [CONTY_RUNNING]  = "running",
-            [CONTY_STOPPED]  = "stopped"
-    };
-    return status_str[container->cc_status];
-}
-
 int conty_container_init(struct conty_container *cc, const char *id, const char *bundle);
 int conty_container_spawn(struct conty_container *cc);
 
-void conty_container_free(struct conty_container *container);
-
 CREATE_CLEANER(struct conty_container *, conty_container_free);
-#define CONTAINER_MEM_RESOURCE MAKE_RESOURCE(conty_container_free)
+#define CONTAINER_RESOURCE MAKE_RESOURCE(conty_container_free)
 
 #endif //CONTY_CONTAINER_H

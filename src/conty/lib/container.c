@@ -9,15 +9,21 @@
 #include "clone.h"
 #include "user.h"
 #include "mount.h"
+#include <sys/syscall.h>
 
 static int init_namespaces(struct conty_container *cc);
 static int ns_sharer(void *arg);
 static int container_entrypoint(void *arg);
 static int run_hooks(struct conty_container *cc, int event);
 
+static inline int clone_get_pid()
+{
+    return (int) syscall(SYS_getpid);
+}
+
 struct conty_container *conty_container_create(const char *id, const char *bundle)
 {
-    CONTAINER_MEM_RESOURCE struct conty_container *cc = NULL;
+    CONTAINER_RESOURCE struct conty_container *cc = NULL;
 
     cc = malloc(sizeof(struct conty_container));
     if (!cc)
@@ -183,14 +189,42 @@ void conty_container_free(struct conty_container *container)
     }
 }
 
+int conty_container_pollfd(const struct conty_container *cc)
+{
+    return cc->cc_pollfd;
+}
+
+void conty_container_set_status(struct conty_container *cc,
+                                conty_container_status_t status)
+{
+    cc->cc_status = status;
+}
+
+conty_container_status_t conty_container_status(const struct conty_container *container)
+{
+    return container->cc_status;
+}
+
+const char *conty_container_status_str(const struct conty_container *container)
+{
+    static const char *status_str[CONTY_STATUS_MAX + 1] = {
+            [CONTY_CREATING] = "creating",
+            [CONTY_CREATED]  = "created",
+            [CONTY_RUNNING]  = "running",
+            [CONTY_STOPPED]  = "stopped"
+    };
+    return status_str[container->cc_status];
+}
+
 static int container_entrypoint(void *arg)
 {
-    CONTAINER_MEM_RESOURCE struct conty_container *cc = (struct conty_container *) arg;
+    CONTAINER_RESOURCE struct conty_container *cc = (struct conty_container *) arg;
     struct oci_conf *conf = cc->cc_conf;
     struct oci_process *proc = &conf->oc_proc;
     struct conty_rootfs rootfs;
 
     conty_sync_init_container(cc->cc_syncfds);
+    cc->cc_pid = clone_get_pid();
 
     /*
      * First, the child will wake the parent and instruct it to run

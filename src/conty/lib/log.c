@@ -1,7 +1,5 @@
 #include "log.h"
 
-#include <pthread.h>
-
 static const char *conty_log_levels[CONTY_LOG_FATAL+1] = {
         [CONTY_LOG_TRACE] = "TRACE",
         [CONTY_LOG_DEBUG] = "DEBUG",
@@ -11,14 +9,16 @@ static const char *conty_log_levels[CONTY_LOG_FATAL+1] = {
         [CONTY_LOG_FATAL] = "FATAL",
 };
 
-#define CONTY_LOG_MAX_CALLBACKS 16
-
+/*
+ * Logger object
+ * Currently the logger isn't protected by a lock so messages
+ * will most definitely be interleaved
+ */
 static struct {
     void        *udata;
     int          level;
     int          quiet;
 } CONTY_LOGGER;
-
 
 void conty_log_set_level(int level)
 {
@@ -31,15 +31,6 @@ void conty_log_set_quiet(int quiet)
 }
 
 static void conty_log_stdout_cb(struct conty_log_event *event)
-{
-    fprintf(event->udata, "%-5s %s:%d: ",
-            conty_log_levels[event->lvl], event->file, event->line);
-    vfprintf(event->udata, event->fmt, event->varargs);
-    fprintf(event->udata, "\n");
-    fflush(event->udata);
-}
-
-static void conty_log_file_cb(struct conty_log_event *event)
 {
     fprintf(event->udata, "%-5s %s:%d: ",
             conty_log_levels[event->lvl], event->file, event->line);

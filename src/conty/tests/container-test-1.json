@@ -1,9 +1,8 @@
 {
   "process": {
     "args": [
-      "sh",
-      "echo",
-      "lol"
+      "sleep",
+      "120"
     ],
     "cwd": "/bin"
   },
@@ -33,14 +32,14 @@
   ],
   "uid_mappings": [
     {
-      "sandbox_id": 0,
+      "container_id": 0,
       "host_id": 1000,
       "size": 1
     }
   ],
   "gid_mappings": [
     {
-      "sandbox_id": 0,
+      "container_id": 0,
       "host_id": 1000,
       "size": 1
     }

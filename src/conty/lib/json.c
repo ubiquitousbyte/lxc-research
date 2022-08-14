@@ -513,8 +513,8 @@ void oci_conf_free(struct oci_conf *conf)
         LIST_CLEAN(&conf->oc_hooks.oehk_on_container_start, ohk_next, oci_hook_free);
         LIST_CLEAN(&conf->oc_hooks.oehk_on_container_started, ohk_next, oci_hook_free);
         LIST_CLEAN(&conf->oc_hooks.oehk_on_container_stopped, ohk_next, oci_hook_free);
-        LIST_CLEAN(&conf->oc_uids, oid_next, mem_cleaner_func);
-        LIST_CLEAN(&conf->oc_gids, oid_next, mem_cleaner_func);
+        LIST_CLEAN(&conf->oc_uids, oid_next, free);
+        LIST_CLEAN(&conf->oc_gids, oid_next, free);
 
         free(conf);
     }

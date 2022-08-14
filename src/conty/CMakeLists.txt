@@ -12,9 +12,7 @@ string(APPEND CMAKE_C_FLAGS "-D_GNU_SOURCE")
 
 # Dependencies
 include(dependencies/libjsonc.cmake)
-#include(dependencies/libcap.cmake)
-#include(dependencies/libjsonc.cmake)
-#include(dependencies/libnl.cmake)
 
 add_subdirectory(lib)
+add_subdirectory(src)
 add_subdirectory(tests)

@@ -1,6 +1,7 @@
 #include "user.h"
 
 #include <fcntl.h>
+#include <string.h>
 
 #include "log.h"
 #include "resource.h"
@@ -9,16 +10,13 @@
 int conty_id_map_put(struct conty_id_map *map, unsigned int left,
                      unsigned int right, unsigned int range)
 {
-    size_t n_bytes;
+    int n_bytes;
 
-    n_bytes = strnprintf(NULL, 0, "%u %u %u\n", left, right, range);
-    if (n_bytes < 0)
-        return log_error_ret(n_bytes, "insufficient space in id map");
-
+    n_bytes = snprintf(NULL, 0, "%u %u %u\n", left, right, range);
     if (map->cidm_len + n_bytes > sizeof(map->cidm_buf) - 1)
         return log_error_ret(-EIO, "insufficient space in id map");
 
-    n_bytes = strnprintf(&map->cidm_buf[map->cidm_len], n_bytes, "%u %u %u\n",
+    n_bytes = strnprintf(&map->cidm_buf[map->cidm_len], n_bytes + 1, "%u %u %u\n",
                          left, right, range);
     if (n_bytes < 0)
         return log_error_ret(n_bytes, "insufficient space in id map");

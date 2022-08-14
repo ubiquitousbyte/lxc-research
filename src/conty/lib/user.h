@@ -18,7 +18,8 @@ struct conty_id_map {
 
 static inline void conty_id_map_init(struct conty_id_map *map)
 {
-    memset(map, 0, sizeof(*map));
+    memset(map->cidm_buf, 0, CONTY_ID_MAP_SIZE);
+    map->cidm_len = 0;
 }
 
 /*

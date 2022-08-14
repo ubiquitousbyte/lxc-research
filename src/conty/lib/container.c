@@ -13,10 +13,11 @@
 static int init_namespaces(struct conty_container *cc);
 static int ns_sharer(void *arg);
 static int container_entrypoint(void *arg);
+static int run_hooks(struct conty_container *cc, int event);
 
 struct conty_container *conty_container_create(const char *id, const char *bundle)
 {
-    MAKE_RESOURCE(conty_container_delete) struct conty_container *cc = NULL;
+    CONTAINER_MEM_RESOURCE struct conty_container *cc = NULL;
 
     cc = malloc(sizeof(struct conty_container));
     if (!cc)
@@ -36,23 +37,27 @@ struct conty_container *conty_container_create(const char *id, const char *bundl
      * wait for that event first
      */
     if (conty_sync_await_container(cc->cc_syncfds, EVENT_RT_CREATE) != 0)
-        goto reap_and_exit;
+        goto err_reap_and_exit;
 
     /*
-     * TODO: Run runtime hooks here
+     * Runtime creation event received. Run hooks
      */
+    if (run_hooks(cc, EVENT_RT_CREATE) != 0)
+        goto err_notify_and_exit;
 
     /*
      * Great, the runtime environment is set up, now instruct the container
      * that it needs to proceed by pivoting into the new environment
-     * and acknowledging that all went well
+     * and acknowledging that the procedure completed successfully
      */
     if (conty_sync_container(cc->cc_syncfds, EVENT_CONT_CREATE) != 0)
-        goto reap_and_exit;
+        goto err_reap_and_exit;
 
     return move_ptr(cc);
 
-reap_and_exit:
+err_notify_and_exit:
+    conty_sync_wake_container(cc->cc_syncfds, EVENT_ERROR);
+err_reap_and_exit:
     waitpid(cc->cc_pid, NULL, 0);
     return NULL;
 }
@@ -61,20 +66,33 @@ int conty_container_start(struct conty_container *container)
 {
     /*
      * The container must be waiting to be started, so simply instruct
-     * it to execute and wait for a status report
+     * it to execute.
+     *
+     * Now, if the container fails to execute, then it will return an EVENT_ERROR,
+     * which results in -EMSGSIZE, because we're not expecting an error.
+     *
+     * If it managed to call execve, then the synchronisation file descriptor
+     * on its end will be closed (because it was created with CLOEXEC set),
+     * thereby causing the read operation to return 0, i.e -ENODATA
      */
-    if (conty_sync_container(container->cc_syncfds, EVENT_CONT_START) != 0)
-        goto reap_and_exit;
+    if (conty_sync_container(container->cc_syncfds, EVENT_CONT_START) != -ENODATA)
+        return -1;
+
+    /*
+     * Container was successfully started, so execute post start hooks
+     */
+    if (run_hooks(container, EVENT_CONT_STARTED) != 0)
+        return -1;
 
     return 0;
-
-reap_and_exit:
-    waitpid(container->cc_pid, NULL, 0);
-    return -1;
 }
 
 int conty_container_kill(struct conty_container *container, int sig)
 {
+    /*
+     * Send the user-defined signal to the container process through the
+     * pollable file descriptor
+     */
     if (pidfd_send_signal(container->cc_pollfd, sig, NULL, 0) != 0)
         return log_error_ret(-errno, "cannot kill container %s", container->cc_id);
     return 0;
@@ -82,12 +100,9 @@ int conty_container_kill(struct conty_container *container, int sig)
 
 int conty_container_delete(struct conty_container *container)
 {
-    if (container) {
-        if (container->cc_conf)
-            oci_conf_free(container->cc_conf);
-
-
-    }
+    int err = run_hooks(container, EVENT_CONT_STOPPED);
+    conty_container_free(container);
+    return err;
 }
 
 int conty_container_init(struct conty_container *cc, const char *id, const char *bundle)
@@ -152,13 +167,28 @@ int conty_container_spawn(struct conty_container *cc)
     return 0;
 }
 
+void conty_container_free(struct conty_container *container)
+{
+    if (container) {
+        if (container->cc_conf)
+            oci_conf_free(container->cc_conf);
+        if (container->cc_pollfd >= 0)
+            close(container->cc_pollfd);
+        if (container->cc_syncfds[0] >= 0)
+            close(container->cc_syncfds[0]);
+        if (container->cc_syncfds[1] >= 0)
+            close(container->cc_syncfds[1]);
+        free(container);
+        container = NULL;
+    }
+}
+
 static int container_entrypoint(void *arg)
 {
-    CONTAINER_RESOURCE struct conty_container *cc = (struct conty_container *) arg;
+    CONTAINER_MEM_RESOURCE struct conty_container *cc = (struct conty_container *) arg;
     struct oci_conf *conf = cc->cc_conf;
     struct oci_process *proc = &conf->oc_proc;
     struct conty_rootfs rootfs;
-    int err;
 
     conty_sync_init_container(cc->cc_syncfds);
 
@@ -274,10 +304,15 @@ static int container_entrypoint(void *arg)
     if (conty_sync_await_runtime(cc->cc_syncfds, EVENT_CONT_CREATE) != 0)
         goto err_out;
 
+    /*
+     * Run container creation hooks before pivoting
+     */
+    if (run_hooks(cc, EVENT_CONT_CREATED) != 0)
+        goto err_notify_runtime;
+
     if (cc->cc_ns_new & CLONE_NEWNS) {
         /*
-         * The runtime told us to move forward, so we replace the old
-         * root filesystem image with the new one
+         * Replace the old root filesystem with the new one
          */
         if (conty_rootfs_pivot(&rootfs) != 0)
             goto err_notify_runtime;
@@ -285,15 +320,20 @@ static int container_entrypoint(void *arg)
 
     /*
      * Alright, we've pivoted into the new environment.
-     * What's left is for the runtime to instructs us to
+     * What's left is for the runtime to instruct us to
      * actually execute the user-defined binary via an EVENT_START
      */
     if (conty_sync_runtime(cc->cc_syncfds, EVENT_CONT_CREATED) != 0)
         goto err_out;
 
     /*
-     * We received the start request, so chdir into the current working
-     * directory of the user application and call execvp;
+     * We received the start request, so execute the start hooks
+     */
+    if (run_hooks(cc, EVENT_CONT_START) != 0)
+        goto err_notify_runtime;
+
+    /*
+     * chdir into the current working directory of the user application
      */
     if (chdir(proc->oproc_cwd) != 0)
         goto err_notify_runtime;
@@ -316,7 +356,7 @@ static int ns_sharer(void *arg)
     for (conty_ns_t ns = 0; ns < CONTY_NS_LEN; ns++) {
         FD_RESOURCE int nsfd = -EBADF;
 
-        nsfd = cc->cc_ns_fds[ns];
+        nsfd = move_fd(cc->cc_ns_fds[ns]);
         if (nsfd >= 0 && (conty_ns_set(nsfd, 0) < 0))
             return log_error_ret(-1, "cannot join namespace");
     }
@@ -368,6 +408,45 @@ static int init_namespaces(struct conty_container *cc)
         }
 
         ns_set |= flag;
+    }
+
+    return 0;
+}
+
+static int run_hooks(struct conty_container *cc, int event)
+{
+    int err;
+    MAKE_RESOURCE(oci_process_state_free) struct oci_process_state *state = NULL;
+    struct oci_hook *cur, *tmp;
+    struct oci_event_hooks *hooks = &cc->cc_conf->oc_hooks;
+    const struct oci_hooks hook_table[] = {
+            [EVENT_RT_CREATE]    = hooks->oehk_on_runtime_create,
+            [EVENT_CONT_CREATED] = hooks->oehk_on_container_created,
+            [EVENT_CONT_START]   = hooks->oehk_on_container_start,
+            [EVENT_CONT_STARTED] = hooks->oehk_on_container_started,
+            [EVENT_CONT_STOPPED] = hooks->oehk_on_container_stopped,
+    };
+
+    state = calloc(1, sizeof(struct oci_process_state));
+    if (!state)
+        return log_fatal_ret(-ENOMEM, "out of memory");
+
+    state->opst_pid          = cc->cc_pid;
+    state->opst_rootfs       = strdup(cc->cc_conf->oc_rootfs.orfs_path);
+    state->opst_container_id = strdup(cc->cc_id);
+    state->opst_status       = strdup(conty_container_status_str(cc));
+
+    SLIST_FOREACH_SAFE(cur, &hook_table[event], ohk_next, tmp) {
+        if ((err = oci_hook_exec(cur, state)) != 0) {
+            /*
+             * STARTED and STOPPED hooks are infallible so simply
+             * log the error and continue as if nothing happened
+             */
+            if (event == EVENT_CONT_STARTED || event == EVENT_CONT_STOPPED)
+                LOG_WARN("hook %s failed", cur->ohk_path);
+            else
+                return err;
+        }
     }
 
     return 0;

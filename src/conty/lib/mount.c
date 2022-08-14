@@ -159,9 +159,9 @@ int conty_rootfs_mount_dev(struct conty_rootfs *rfs)
      * set the mode to 0755 to make it writable only by the current user
      * and limit its capacity to hold data
      */
-    err = mount("", rfs->cro_buf, "tmpfs", MS_REC | MS_PRIVATE, "mode=0755,size=500000");
+    err = mount("none", rfs->cro_buf, "tmpfs", 0, "mode=0755,size=500000");
     if (err < 0) {
-        LOG_ERROR("failed to mount dev directory");
+        LOG_ERROR("failed to mount dev directory: %s", strerror(errno));
         err = -errno;
     }
 
@@ -212,7 +212,7 @@ int conty_rootfs_mkdev(struct conty_rootfs *rfs)
         devmode = makedev(devs[i].major, devs[i].minor);
         err = mknod(rfs->cro_buf, devs[i].mode, devmode);
         if (err < 0 && errno == EPERM) {
-            LOG_DEBUG("failed to create device %s, bind mounting..", devs[i].name);
+            LOG_DEBUG("failed to create device %s", devs[i].name);
 
             err = strnprintf(hostdev, sizeof(hostdev), "/dev/%s", devs[i].name);
             if (err < 0) {
@@ -290,15 +290,15 @@ int conty_rootfs_mount_sys(struct conty_rootfs *rfs)
 
 int conty_rootfs_mount_mqueue(struct conty_rootfs *rfs)
 {
-    LOG_INFO("mounting mqueue at %s/mqueue", rfs->cro_dst);
+    LOG_INFO("mounting mqueue at %s/dev/mqueue", rfs->cro_dst);
     unsigned int flags = MS_NODEV | MS_NOSUID | MS_NOEXEC;
     mode_t perm =  S_IRWXU | S_IRWXG | S_IRWXO;
-    return conty_rootfs_mount_pseudofs(rfs, "mqueue", "mqueue", flags, perm);
+    return conty_rootfs_mount_pseudofs(rfs, "dev/mqueue", "mqueue", flags, perm);
 }
 
 int conty_rootfs_mount_shm(struct conty_rootfs *rfs)
 {
-    LOG_INFO("mounting shm at %s/shm", rfs->cro_dst);
+    LOG_INFO("mounting shm at %s/dev/shm", rfs->cro_dst);
     /*
      * shm can't be mounted with MS_NOEXEC because
      * it may break some apps that mmap a shared-memory region with PROT_EXEC set
@@ -309,5 +309,5 @@ int conty_rootfs_mount_shm(struct conty_rootfs *rfs)
      * so the permissions on this mount point are pretty liberal
      */
     mode_t perm =  S_IRWXU | S_IRWXG | S_IRWXO;
-    return conty_rootfs_mount_pseudofs(rfs, "shm", "tmpfs", flags, perm);
+    return conty_rootfs_mount_pseudofs(rfs, "dev/shm", "tmpfs", flags, perm);
 }

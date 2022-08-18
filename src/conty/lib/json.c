@@ -18,6 +18,17 @@ static char *deser_str(json_object *root)
     return strndup(json_object_get_string(root), str_len);
 }
 
+static char *deser_path(json_object *root)
+{
+    size_t str_len;
+
+    str_len = json_object_get_string_len(root);
+    if (str_len <= 0)
+        return NULL;
+
+    return realpath(json_object_get_string(root), NULL);
+}
+
 static char **deser_strlist(json_object *root)
 {
     size_t argv_len;
@@ -53,7 +64,7 @@ static int deser_rootfs(json_object *root, struct oci_rootfs *rootfs)
     if (!obj)
         return log_error_ret(-EINVAL, "oci: root filesystem path missing");
 
-    if (!(rootfs->orfs_path = deser_str(obj)))
+    if (!(rootfs->orfs_path = deser_path(obj)))
         return log_error_ret(-EINVAL, "oci: root filesystem path missing");
 
     obj = json_object_object_get(root, "readonly");

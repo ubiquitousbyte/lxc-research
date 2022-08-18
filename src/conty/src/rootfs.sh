@@ -50,36 +50,3 @@ if [ $? -ne 0 ]; then
   echo "cannot extract rootfs to $out/cpu"
   exit 1
 fi
-
-# Now download golang and add it to each root filesystem
-
-# We need to change arch because go uses a different scheme
-if [ "$arch" = "x86_64" ]; then
-  arch="amd64"
-elif [ "$arch" = "aarch64" ]; then
-  arch="arm64"
-fi
-
-if [ ! -f "$out/go1.19.linux-$arch.tar.gz" ]; then
-  wget --directory-prefix=$out "https://go.dev./dl/go1.19.linux-$arch.tar.gz"
-else
-  echo "tar ball go1.19.linux-$arch.tar.gz already exists.. skipping download"
-fi
-
-tar -zxvf $out/go1.19.linux-$arch.tar.gz -C $out/net/usr/local
-if [ $? -ne 0 ]; then
-  echo "cannot extract golang to $out/net/usr/local"
-  exit 1
-fi
-
-tar -zxvf $out/go1.19.linux-$arch.tar.gz -C $out/disk/usr/local
-if [ $? -ne 0 ]; then
-  echo "cannot extract golang to $out/disk/usr/local"
-  exit 1
-fi
-
-tar -zxvf $out/go1.19.linux-$arch.tar.gz -C $out/cpu/usr/local
-if [ $? -ne 0 ]; then
-  echo "cannot extract golang to $out/cpu/usr/local"
-  exit 1
-fi

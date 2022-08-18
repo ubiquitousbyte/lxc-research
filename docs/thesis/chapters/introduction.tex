@@ -13,14 +13,41 @@ The aforementioned issues were addressed by shifting the responsibility of resou
 and process protection into a privileged control program that acted as an intermediary between 
 hardware and user programs. This program was most commonly referred to as a kernel. 
 
-
-TODO
 \section{Objectives}
-The primary objective of this thesis is to introduce and benchmark the namespace abstraction 
-and see how it affects the performance of an application. In addition, each namespace will be 
-qualitatively evaluated against its ability to satisfy two security axioms - isolation and noninterference 
-between processes. The qualitative results will be contrasted against the results of the 
-performance benchmark to show the relationship between resource namespacing and performance. 
+The primary objective of this thesis is to create a set of synthetic workloads and 
+measure their performance characteristics when deployed inside a sandboxed environment.
+The same workloads will also be executed natively within the standard noninterference boundary
+provided by the kernel. The measurements will be compared and evaluated in an attempt to 
+outline the relationship between noninterference, isolation and performance. 
+A command-line tool will be developed to run the workloads and generate the measurements
+so that the results are reproducible.
+
+A custom container runtime will be designed, implemented and used by the command-line tool
+as the primary sandboxing mechanism. The system call interface used for sandboxing 
+the workloads will be discussed. The overhead introduced by the runtime to spawn 
+a container will also be compared to the overhead associated with spawning a simple process.
 
 \section{Content Structure}
-TODO
+Chapter \ref{ch:fundamentals} introduces the fundamental axioms, or trade-offs, in virtualisation technologies.
+These will be referred to throughout the entire document. 
+The same chapter also introduces the concept of resource namespaces - the primary abstraction 
+provided by the kernel to sandbox processes. Furthermore, the extended Berkley Packet Filter (eBPF)
+subsystem of the kernel is described, which we use to probe metrics from the kernel
+that measure workload performance.
+
+Chapter \ref{ch:state-of-research} outlines the current state of research in operating-system 
+virtualisation, highlights the relationships between noninterference, isolation and performance, and
+discusses modern architectures that try to maximise all three.     
+
+Chapter \ref{ch:concept} provides a detailed description of the requirements and the software architecture 
+of the runtime, benchmark tool, and the workloads. The measurements to be sampled from the kernel are introduced.
+
+Chapter \ref{ch:implementation} describes the system calls used to create the sandbox environment.
+Important implementation details are also mentioned.
+
+Chapter \ref{ch:results} shows the results of the performance measurements and highlights the 
+differences between running the workloads inside and outside a sandbox. The results are evaluated 
+and the primary performance bottlenecks are discussed.
+
+Chapter \ref{ch:conclusion} contains conclusive remarks, a brief summary of the results of the thesis
+and future work that can be done by other students in the field. 

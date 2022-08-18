@@ -1,0 +1,47 @@
+{
+  "process": {
+    "args": [
+      "nsbench-net-workload"
+    ],
+    "cwd": "/"
+  },
+  "root": {
+    "path": "./rootfs/net",
+    "readonly": false
+  },
+  "namespaces": [
+    {
+      "type": "user"
+    },
+    {
+      "type": "net"
+    },
+    {
+      "type": "ipc"
+    },
+    {
+      "type": "mnt"
+    },
+    {
+      "type": "uts"
+    },
+    {
+      "type": "pid"
+    }
+  ],
+  "uid_mappings": [
+    {
+      "container_id": 0,
+      "host_id": 1000,
+      "size": 1
+    }
+  ],
+  "gid_mappings": [
+    {
+      "container_id": 0,
+      "host_id": 1000,
+      "size": 1
+    }
+  ],
+  "hostname": "nsbench-cpu-workload"
+}

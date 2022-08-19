@@ -6,7 +6,7 @@
     "cwd": "/"
   },
   "root": {
-    "path": "./rootfs/disk",
+    "path": "./workloads/rootfs/disk",
     "readonly": false
   },
   "namespaces": [

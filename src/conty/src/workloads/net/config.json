@@ -1,12 +1,12 @@
 {
   "process": {
     "args": [
-      "nsbench-cpu-workload"
+      "nsbench-net-workload"
     ],
     "cwd": "/"
   },
   "root": {
-    "path": "./rootfs/cpu",
+    "path": "./workloads/rootfs/net",
     "readonly": false
   },
   "namespaces": [

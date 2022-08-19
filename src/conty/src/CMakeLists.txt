@@ -4,17 +4,8 @@ project(nsbench
         DESCRIPTION "Benchmark CLI for measuring system performance"
         LANGUAGES C)
 
-# Generate a root filesystem for every workload
-set(NSBENCH_ROOTFS_DIR ${CMAKE_CURRENT_BINARY_DIR}/rootfs)
-add_custom_command(
-        OUTPUT ${NSBENCH_ROOTFS_DIR}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
-        COMMAND bash rootfs.sh ${NSBENCH_ROOTFS_DIR})
-add_custom_target(nsbench-rootfs-setup DEPENDS ${NSBENCH_ROOTFS_DIR})
-
-add_subdirectory(cpu)
-add_subdirectory(disk)
-add_subdirectory(net)
+add_subdirectory(workloads)
+add_subdirectory(hooks)
 
 add_executable(nsbench nsbench.c)
 target_link_libraries(nsbench conty)

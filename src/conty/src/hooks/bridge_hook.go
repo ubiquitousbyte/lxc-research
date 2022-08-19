@@ -3,7 +3,6 @@ package hooks
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net"
 
 	"github.com/vishvananda/netlink"
@@ -49,7 +48,6 @@ func (b *BridgeHook) OnContainerCreating(state ContainerState) error {
 	defer func() {
 		if err != nil {
 			netlink.LinkDel(veth)
-			log.Fatal(err)
 		}
 	}()
 

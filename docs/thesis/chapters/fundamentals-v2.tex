@@ -76,7 +76,7 @@ part of the namespace can see and manipulate the resource. Namespaces are implem
 kernel and are therefore a part of the trusted computing base. Container runtimes use them 
 to establish a solid noninterference boundary between processes by restricting their view of the system. 
 The system calls \verb|clone|, \verb|unshare|, \verb|setns| and \verb|ioctl|, as well as the 
-\verb|proc| pseudo file system are the primary interaction points between a user-space program and a namespace.  
+\verb|proc| pseudo file system are the primary interaction points between a user-space program and a namespace (See Figure \ref{images:fundamentals/ns-overview.jpg}).
 
 Every process is associated with a fixed-size set of namespaces, called the \textit{namespace proxy}, that corresponds to the
 resources that it can access.
@@ -112,6 +112,14 @@ Some namespaces are represented as $n$-ary trees and can be nested up to $32$ ti
 noninterference boundaries. Relationships between namespaces can be queried via the \verb|ioctl|
 system call that, in combination with the \verb|NS_GET_PARENT| flag, returns an initialised read-only file descriptor pointing at 
 the parent namespace. 
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.55\textwidth]{images/fundamentals/ns-overview.jpg}
+    \caption{Namespace design inside the kernel. Every task is associated with a namespace proxy that can be manipulated 
+    through the virtual file system by reading and writing to files, or through the system call interface}
+    \label{images:fundamentals/ns-overview.jpg}
+\end{figure}
 
 \subsection{User namespace}
 \label{sections:fundamentals/namespaces/user}
@@ -204,12 +212,6 @@ to authorise the creation of the remaining set of namespaces.
 
 \subsection{Process identifier namespace}
 \label{sections:fundamentals/namespaces/process}
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.55\textwidth]{images/fundamentals/pid-namespace-hierarchy.jpg}
-    \caption{PID namespace hierarchy}
-    \label{images:fundamentals/pid-namespace-hierarchy.jpg}
-\end{figure}
 Process identiifer (PID) namespaces encapsulate the mechanism of assigning 
 unique identifiers to their resident processes. Every PID namespace localises an associative 
 array, called the identifier registry, capable of allocating up to $2^{22}$ unique numbers and mapping them to arbitrary 
@@ -239,6 +241,13 @@ Hence, a process is visible to all of its peers in its namespace and to all dire
 namespaces. Conversely, $B_{2}$ and $B_{3}$ cannot see any processes in $A$. 
 Joining a PID namespace is an irrevirtible operation, i.e if $A_{2}$ joins $B$,
 then it cannot go back.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.55\textwidth]{images/fundamentals/pid-namespace-hierarchy.jpg}
+    \caption{PID namespace hierarchy}
+    \label{images:fundamentals/pid-namespace-hierarchy.jpg}
+\end{figure}
 
 PID namespaces can be nested arbitrarily up to 32 times. 
 Container runtimes do not utilise this feature, because application workloads are orthogonal 
@@ -295,25 +304,6 @@ PID TTY TIME CMD
 
 \subsection{Mount Namespace}
 \label{sections:fundamentals/namespaces/mount}
-\begin{table}[h!]
-    \centering
-    \begin{tabular}{ |m{4cm}|m{20em}| }
-        \hline
-        Propagation Type & Description \\
-        \hline
-        \verb|MS_SHARED| & Mount and umount events are propagated across mount namespaces. \\
-        \hline 
-        \verb|MS_PRIVATE| & Mount and umount events are local. The mount point does not propagate, nor does it receive mount and umount events. \\
-        \hline
-        \verb|MS_SLAVE| & Mount and umount events are propagated unidirectionally from a master set of mount points to a slave mount. \\
-        \hline
-        \verb|MS_UNBINDABLE| & Mount point is private and cannot be bind mounted \\
-        \hline
-    \end{tabular}
-    \caption{Table of mount point propagation types in Linux}
-    \label{table:fundamentals/namespaces/mount/propagation-types}
-\end{table}
-
 Files are multiplexed across multiple devices, each with its own intrinsic implementation details 
 for storing and managing data. The kernel abstracts the underlying idiosyncrasies 
 by arranging all files into a hierarchy that can be accessed through a well-defined programming interface. 
@@ -333,6 +323,25 @@ propagation types. The \verb|/proc/self/mountinfo| file
 displays a multitude of mount point properties with respect to the mount namespace in which 
 the process reading the file resides in. 
 
+\begin{table}[h!]
+    \centering
+    \begin{tabular}{ |m{4cm}|m{20em}| }
+        \hline
+        Propagation Type & Description \\
+        \hline
+        \verb|MS_SHARED| & Mount and umount events are propagated across mount namespaces. \\
+        \hline 
+        \verb|MS_PRIVATE| & Mount and umount events are local. The mount point does not propagate, nor does it receive mount and umount events. \\
+        \hline
+        \verb|MS_SLAVE| & Mount and umount events are propagated unidirectionally from a master set of mount points to a slave mount. \\
+        \hline
+        \verb|MS_UNBINDABLE| & Mount point is private and cannot be bind mounted \\
+        \hline
+    \end{tabular}
+    \caption{Table of mount point propagation types in Linux}
+    \label{table:fundamentals/namespaces/mount/propagation-types}
+\end{table}
+
 In addition to mounting device file systems onto the file hierarchy, we can make 
 already mounted subtrees visible at other locations in it. This concept is known as a 
 \textit{bind mount}. Bind mounts are commonly used by container engines to map directories 
@@ -343,13 +352,6 @@ using copy on write.
 
 \subsection{Network Namespace}
 \label{sections:fundamentals/namespaces/network}
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.65\textwidth]{images/fundamentals/net-ns-veth-arch.jpg}
-    \caption{Network architecture that enables inter-container communication via bridge and virtual ethernet devices.}
-    \label{images:fundamentals/net-ns-veth-arch.jpg}
-\end{figure}
-
 Network namespaces encapsulate the full network stack and expose it only to 
 their resident processes. This allows a collection of processes to operate on 
 dedicated network interfaces, routing tables, firewall rules and UNIX domain sockets 
@@ -372,10 +374,19 @@ They are represented by a pair of interconnected endpoints. One end of the virtu
 into the network namespace of the process, and the other remains on the host and is attached 
 to the bridge. Because the bridge acts as a switch, other network devices attached 
 to it can communicate with a namespaced process. Figure (\ref{images:fundamentals/net-ns-veth-arch.jpg})
-visualises such a network configuration. In it, two network namespaces, and a wlan interface
-inside the root namespace, can exchange data over the bridge. Code snippet (\ref{code:fundamentals/namespaces/network-example})
+visualises such a network configuration.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.65\textwidth]{images/fundamentals/net-ns-veth-arch.jpg}
+    \caption{Network architecture that enables inter-container communication via bridge and virtual ethernet devices.}
+    \label{images:fundamentals/net-ns-veth-arch.jpg}
+\end{figure}
+
+In it, two network namespaces, and a wlan interface
+inside the root namespace, can exchange data over the bridge.
+Code snippet (\ref{code:fundamentals/namespaces/network-example})
 shows how to configure such a network.
-\clearpage
 
 \begin{lstlisting}[label={code:fundamentals/namespaces/network-example}, style=bash, caption={Commands for configuring the network as shown in  Figure (\ref{images:fundamentals/net-ns-veth-arch.jpg})}]
 $ ip netns add A 

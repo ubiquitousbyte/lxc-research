@@ -1,1 +1,64 @@
 \chapter{Appendix A}
+\begin{lstlisting}[style={syscalls}, label={code:oci-config.json}, caption={Open Containers Initiative Configuration File Example}]
+{
+    "process": {
+        "args": [
+        "nsbench-disk-workload"
+        ],
+        "cwd": "/"
+    },
+    "root": {
+        "path": "./workloads/rootfs/disk",
+        "readonly": false
+    },
+    "namespaces": [
+        {
+        "type": "user"
+        },
+        {
+        "type": "net"
+        },
+        {
+        "type": "ipc"
+        },
+        {
+        "type": "mnt"
+        },
+        {
+        "type": "uts"
+        },
+        {
+        "type": "pid"
+        }
+    ],
+    "uid_mappings": [
+        {
+        "container_id": 0,
+        "host_id": 1000,
+        "size": 1
+        }
+    ],
+    "gid_mappings": [
+        {
+        "container_id": 0,
+        "host_id": 1000,
+        "size": 1
+        }
+    ],
+    "hostname": "nsbench-disk-workload",
+    "hooks": { 
+        "on_runtime_create": [
+            {
+                "path": "/usr/bin/setup-network",
+                "args": ["-a", "192.168.0.101"],
+                "env": ["PATH=/usr/bin"],
+                "timeout": 2
+            }
+        ],
+        "on_container_created": [],
+        "on_container_start": [],
+        "on_container_started": [],
+        "on_container_stopped": []
+    }
+}
+\end{lstlisting}

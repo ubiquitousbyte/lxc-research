@@ -165,8 +165,8 @@ The traditional UNIX credentials, paired with the capability sets, represent a p
 security context. 
 
 A user namespace encapsulates the security contexts of its resident processes. 
-When a process creates a new user namespace, its effective user identifier
-becomes the owner of the namespace and is granted full capabilities within it.
+When a process creates a new user namespace, it can map its real user identifier on the host system 
+to the user identifier 0 in the new user namespace.
 In other words, a non-privileged user on the host system can become \verb|root| within its own 
 user namespace.
 The kernel associates every resource and thus every other namespace type 

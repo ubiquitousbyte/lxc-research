@@ -99,6 +99,109 @@ The main thread of execution implements a UNIX socket server that accepts reques
 from external applications, e.g the benchmark tool, to satisfy the functional requirements
 defined in the previous paragraph.
 
+When a process is detached into a new user namespace, it's real user identifier is replaced by the kernel 
+with the overflow identifier, also known as the \textit{nobody} user, which has no access to 
+file objects that are not world readable and writable. 
+For this reason, the container runtime must map a range of user identifers from the root user namespace 
+into a range of user identifiers in the user namespace of the process. The user component in Figure 
+\ref{images:concept/runtime-arch-overview.jpg} is responsible for this functionality. 
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.5\textwidth]{images/concept/container-state-diagram.jpg}
+    \caption{State transition diagram of container states. Every state transition is triggered by an operation, whose name is 
+    specified in the arrow.}
+    \label{images:concept/container-state-diagram.jpg}
+\end{figure}
+
+%\begin{table}[h!]
+%    \centering
+%    \begin{tabular}{ |m{3.5cm}|m{3.5cm}|m{20em}| }
+%        \hline
+%        Lifecycle Checkpoint & Request & Description \\
+%        \hline
+%        Runtime Creation & \verb|EVENT_RT_CREATE| & The container instructs the runtime to execute the runtime creation hooks on the host \\
+%        \hline 
+%        Container Creation & \verb|EVENT_CONT_CREATE| & The runtime instructs the container to execute the container creation hooks inside the container environment, after the runtime has been created \\
+%        \hline 
+%        Container Starting & \verb|EVENT_CONT_START| & The runtime instructs the container to execute the container start hooks inside the container environment, right before the user-defined binary is executed \\
+%        \hline 
+%        Container Started & \verb|EVENT_CONT_STARTED| & The container instructs the runtime to execute the container post-start hooks inside the runtime environment, right after the user-defined binary is executed \\
+%        \hline 
+%    \end{tabular}
+%    \caption{Table of requests}
+%    \label{table:concept/container-runtime/architecture/events}
+%\end{table}
+
+Every container has a dedicated root filesystem with its own set of device nodes,
+pseudo filesystems, applications and libraries. The mount component in Figure \ref{images:concept/runtime-arch-overview.jpg}
+atomically changes the container's root mount to a user-defined directory that holds its new root file system.
+It then creates private mount points for all necessary pseudo filesystems, e.g \verb|proc|, \verb|sys|, and \verb|mqueue|. 
+In addition, this component creates private device nodes for the container such as \verb|/dev/null| and \verb|/dev/urandom|.
+
+The namespace component simply wraps some of the namespace system calls and provides a 
+mechanism to enumerate a contiguous sequence of namespaces.
+
+The clone component wraps the raw \verb|clone3()| system call and the \verb|glibc| wrapper 
+into a portable (at least for \verb|x86_64| and \verb|aarch64|) set of functions.
+
+The Open Containers Initiative (OCI) component is responsible for parsing a JSON configuration 
+file that defines the container's execution environment. Code snippet \ref{code:oci-config.json} 
+is an example of such a file. In addition, this component provides a mechanism for executing an 
+arbitrary program, called a hook, that receives the container's state through its standard input stream as a JSON string.
+Hooks are provided by external applications as part of the JSON configuration file and are executed
+when a container transitions into a new state. A container's state transition diagram is shown in 
+Figure \ref{images:concept/container-state-diagram.jpg}. For each unique state transition, a set of hooks 
+gets executed. This design is defined as part of the runtime specification \cite{oci-runtime-lifecycle}.   
+
+The synchronisation component defines an inter-process communication mechanism between 
+the container runtime and a container. The typical communication flow follows the request-response pattern - 
+one end produces a request and blocks until the other end consumes it and produces a response.
+However, to enable concurrent work, a peer can \enquote{fire} a message and forget about the response.
+The requests and responses are simple numeric values with semantic meaning. 
+
+
+%The Open Containers Initiative (OCI) component is responsible for parsing a JSON configuration 
+%file that defines the container's execution environment. Code snippet \ref{code:oci-config.json} 
+%is an example of such a file. In addition, this component provides a mechanism for executing an 
+%arbitrary program, called a hook, that receives the container's state through its standard input stream as a JSON string.
+%These hooks are 
+%This mechanism will be used by external applications to hook into well-defined points of a 
+%container's lifecycle.
+%The runtime prevents the program from temporaly interfering with it by starting a 
+%timer and killing the program if it does not complete when the timer expires.
+%Note that the synchronisation component is tightly coupled to the hook execution process. 
+%The container synchronises with the runtime at specific points of its lifecycle. At those points, 
+%a set of hooks defined by the external application is executed. 
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{images/concept/container-create-start-sequence-diagram.jpg}
+    \caption{Sequence diagram highlighting the container creation and start operations}
+    \label{images:concept/container-create-start-sequence-diagram.jpg}
+\end{figure}
+
+The container component brings all of the core components together. The sequence diagram in 
+Figure \ref{images:concept/container-create-start-sequence-diagram.jpg} shows the procedures 
+executed to create and start a container. The runtime executable invokes the \verb|container_create|
+operation. The container component reads the configuration file and allocates 
+an in-memory representation for the container. It then spawns the container process, which creates 
+a freshly-allocated set of namespaces and joins already existing namespaces, depending on the namespace configuration 
+specified in the file.
+It then transitions into the \enquote{creating} state and notifies the runtime to execute the 
+corresponding hooks by sending an \verb|EVENT_RT_CREATE| through the synchronisation component. 
+The runtime receives the request, executes the runtime hooks, and notifies the child that it should transition 
+into the \enquote{created} state by executing the container creation hooks and atomically swapping the old root mount 
+with the new root filesystem. The container process then blocks indefinitely until it is killed 
+or it receives a start request from the runtime executable. The latter will trigger yet another 
+hook execution procedure, it will move the container into the \enquote{running} state and will afterwards run the user-defined binary. 
+This is detected 
+by the runtime, a set of post-start hooks is triggered, and the runtime executable is notified 
+of the operation's completion.  After the container is created, the executable is responsible for 
+managing the container process. It does so by registering the container with an event loop that
+polls container states and reaps processes that have terminated, which happens when the container 
+transition into the \enquote{stopped} state - either by exiting or being manually killed by the executable through 
+a signal. 
 \section{Benchmark}
 
 \subsection{Requirements}

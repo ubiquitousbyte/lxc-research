@@ -6,7 +6,7 @@ find_program(MAKE NAMES make)
 
 ExternalProject_Add(bpftool
         PREFIX bpftool
-        SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/../bpftool/src
+        SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/../vendor/bpftool/src
 
         CONFIGURE_COMMAND ""
 

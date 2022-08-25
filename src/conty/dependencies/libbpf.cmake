@@ -1,5 +1,3 @@
-
-
 cmake_minimum_required(VERSION 3.14)
 
 include(ExternalProject)
@@ -8,7 +6,7 @@ find_program(MAKE NAMES make)
 
 ExternalProject_Add(libbpf
         PREFIX libbpf
-        SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/../libbpf/src
+        SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/../vendor/libbpf/src
 
         CONFIGURE_COMMAND ""
 

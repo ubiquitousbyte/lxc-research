@@ -8,10 +8,14 @@ set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS ON)
 string(APPEND CMAKE_C_FLAGS "-D_GNU_SOURCE")
-#add_compile_definitions($<$<CONFIG:DEBUG>:CONTY_DEBUG>)
 
 # Dependencies
 include(dependencies/libjsonc.cmake)
+include(dependencies/libbpf.cmake)
+include(dependencies/bpftool.cmake)
+
+# Modules
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/modules)
 
 add_subdirectory(lib)
 add_subdirectory(src)

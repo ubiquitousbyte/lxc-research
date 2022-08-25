@@ -11,8 +11,7 @@ ExternalProject_Add(libcap
 
         CONFIGURE_COMMAND ""
         BUILD_COMMAND ${MAKE_BIN} FAKEROOT=<INSTALL_DIR>
-        INSTALL_COMMAND ${MAKE_BIN} FAKEROOT=<INSTALL_DIR> install
-        )
+        INSTALL_COMMAND ${MAKE_BIN} FAKEROOT=<INSTALL_DIR> install)
 
 ExternalProject_Get_Property(libcap INSTALL_DIR)
 

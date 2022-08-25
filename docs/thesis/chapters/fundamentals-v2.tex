@@ -302,7 +302,7 @@ PID TTY TIME CMD
 %interfering with its peers, the kernel only propagates signals for which the init process 
 %has established handlers for. 
 
-\subsection{Mount Namespace}
+\subsection{Mount namespace}
 \label{sections:fundamentals/namespaces/mount}
 Files are multiplexed across multiple devices, each with its own intrinsic implementation details 
 for storing and managing data. The kernel abstracts the underlying idiosyncrasies 
@@ -350,7 +350,7 @@ the data structures of the original mount into a new mount point inside
 container's mount namespace. Changes in one mount point are reflected in the other 
 using copy on write. 
 
-\subsection{Network Namespace}
+\subsection{Network namespace}
 \label{sections:fundamentals/namespaces/network}
 Network namespaces encapsulate the full network stack and expose it only to 
 their resident processes. This allows a collection of processes to operate on 
@@ -420,7 +420,7 @@ Now, both namespaces and the host can communicate with each other.
 However, a mechanism for routing traffic from the bridge to a different node in the 
 host network or the internet is missing. 
 
-\subsection{Interprocess Communication Namespace}
+\subsection{Interprocess communication namespace}
 \label{sections:fundamentals/namespaces/ipc}
 An interprocess communication (IPC) namespace encapsulates System V objects and POSIX 
 message queues and makes them visible only to its resident processes.
@@ -429,7 +429,7 @@ that cannot be accessed by processes outside the namespace.
 When all processes in an IPC namespace terminate, all IPC objects are automatically
 destroyed. 
 
-\subsection{UNIX Time-Sharing Namespace}
+\subsection{UNIX time sharing namespace}
 \label{sections:fundamentals/namespaces/uts}
 UNIX Time-Sharing (uts) namespaces encapsulate the system's host name and domain name.
 When creating a new uts namespace, the kernel simply copies the system identifiers of the 
@@ -437,6 +437,3 @@ previous namespace and exposes the copied versions to all residents of the names
 The residents are free to change both identifiers without affecting the actual values 
 on the host. Example (\ref{code:fundamentals/namespaces/user-example}) already highlights 
 how to detach a shell into a new uts namespace and set its host name.
-
-\section{Extended Berkley Packet Filters (eBPF)}
-\label{sections:fundamentals/ebpf}

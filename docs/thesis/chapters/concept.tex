@@ -183,8 +183,9 @@ The requests and responses are simple numeric values with semantic meaning.
 
 The container component brings all of the core components together. The sequence diagram in 
 Figure \ref{images:concept/container-create-start-sequence-diagram.jpg} shows the procedures 
-executed to create and start a container. The runtime executable invokes the \verb|container_create|
-operation. The container component reads the configuration file and allocates 
+executed to create and start a container. The runtime executable invokes the create
+operation, as defined in requirement (\ref{requirements:container-runtime/2}). 
+The container component reads the configuration file and allocates 
 an in-memory representation for the container. It then spawns the container process, which creates 
 a freshly-allocated set of namespaces and joins already existing namespaces, depending on the namespace configuration 
 specified in the file.
@@ -197,17 +198,32 @@ or it receives a start request from the runtime executable. The latter will trig
 hook execution procedure, it will move the container into the \enquote{running} state and will afterwards run the user-defined binary. 
 This is detected 
 by the runtime, a set of post-start hooks is triggered, and the runtime executable is notified 
-of the operation's completion.  After the container is created, the executable is responsible for 
+of the operation's completion.  
+
+After the container is created, the executable is responsible for 
 managing the container process. It does so by registering the container with an event loop that
 polls container states and reaps processes that have terminated, which happens when the container 
-transition into the \enquote{stopped} state - either by exiting or being manually killed by the executable through 
+transitions into the \enquote{stopped} state - either by exiting or being manually killed by the executable through 
 a signal. 
 \section{Benchmark}
+Benchmarking is a tool to test performance in a controlled way, allowing different 
+system and software configurations to be compared and analysed.
 
-\subsection{Requirements}
+Our primary goal is to measure the overhead associated with isolating a process from the host system 
 
+
+\subsection{Functional requirements}
+
+\subsection{Non-functional requirements}
+\begin{enumerate}[i]
+    \item The benchmark must be repeatable to facilitate comparisons
+    \label{requirements:non-functional/benchmark/1}
+    \item The benchmark must be observable, either through visualisations or formatted text outputs, 
+    so that it can be analysed
+    \label{requirements:non-functional/benchmark/2}
+    \end{enumerate}
 \subsection{Methodology}
 
 \subsection{Workloads}
 
-\subsection{User interface}
+\subsection{Command-line interface}

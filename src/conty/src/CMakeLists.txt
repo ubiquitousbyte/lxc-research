@@ -1,13 +1,14 @@
 cmake_minimum_required(VERSION 3.14)
-project(conty-runtime
+project(conty-bench
         VERSION 1.0.0
-        DESCRIPTION "Basic container runtime"
+        DESCRIPTION "Container benchmarking tool using eBPF tracing"
         LANGUAGES C)
 
-#add_subdirectory(workloads)
-#add_subdirectory(hooks)
+find_package(BpfGen REQUIRED)
 
-add_subdirectory(bpf)
+add_bpf_skeleton(tcplatency tcplatency.bpf.c)
+add_bpf_skeleton(rqlatency rqlatency.bpf.c)
+add_bpf_skeleton(vfslatency vfslatency.bpf.c)
 
-add_executable(conty-runtime runtime.c runtime.h)
-target_link_libraries(conty-runtime PUBLIC conty)
+add_executable(conty-bench bench.c bench.h histogram.h tcplatency.h tcplatency.c resource.h log.h log.c tick.h tick.c rqlatency.h rqlatency.c vfslatency.c vfslatency.h histogram.c)
+target_link_libraries(conty-bench tcplatency_skel rqlatency_skel vfslatency_skel)

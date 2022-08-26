@@ -30,8 +30,8 @@ if (NOT EXISTS "${BPFGEN_VMLINUX_H}")
     add_custom_command(
             OUTPUT ${BPFGEN_VMLINUX_H}
             COMMAND
-            ${BPFGEN_BPFTOOL} btf dump file
-            /sys/kernel/btf/vmlinux format c > ${BPFGEN_VMLINUX_H}
+                ${BPFGEN_BPFTOOL} btf dump file
+                /sys/kernel/btf/vmlinux format c > ${BPFGEN_VMLINUX_H}
             DEPENDS ${BPFGEN_BPFTOOL}
             VERBATIM)
 endif()
@@ -47,17 +47,17 @@ macro(add_bpf_skeleton SKEL_NAME SOURCE_FILE)
     add_custom_command(
             OUTPUT ${BPF_O_FILE}
             COMMAND
-            ${BPFGEN_CLANG} -g -O2 -target bpf
-            -I${BPFGEN_VMLINUX_DIR} -isystem ${LIBBPF_INCLUDE_DIRS}
-            -c ${BPF_C_FILE} -o ${BPF_O_FILE}
+                ${BPFGEN_CLANG} -g -O2 -target bpf -D__TARGET_ARCH_x86
+                -I${BPFGEN_VMLINUX_DIR} -isystem ${LIBBPF_INCLUDE_DIRS}
+                -c ${BPF_C_FILE} -o ${BPF_O_FILE}
             VERBATIM
             DEPENDS ${BPF_C_FILE})
 
     add_custom_command(
             OUTPUT ${BPF_SKEL_FILE}
             COMMAND
-            bash -c "${BPFGEN_BPFTOOL} gen skeleton ${BPF_O_FILE} \
-                > ${BPF_SKEL_FILE}"
+                bash -c "${BPFGEN_BPFTOOL} gen skeleton ${BPF_O_FILE} \
+                    > ${BPF_SKEL_FILE}"
             VERBATIM
             DEPENDS ${BPF_O_FILE} ${BPFGEN_VMLINUX_H})
 
@@ -65,13 +65,13 @@ macro(add_bpf_skeleton SKEL_NAME SOURCE_FILE)
     target_sources(${OUTPUT_TARGET} INTERFACE ${BPF_SKEL_FILE})
     target_include_directories(${OUTPUT_TARGET}
             INTERFACE
-            ${CMAKE_CURRENT_BINARY_DIR}
-            ${BPFGEN_VMLINUX_DIR}
+                ${CMAKE_CURRENT_BINARY_DIR}
+                ${BPFGEN_VMLINUX_DIR}
             SYSTEM INTERFACE
-            ${LIBBPF_INCLUDE_DIRS})
+                ${LIBBPF_INCLUDE_DIRS})
     target_link_libraries(${OUTPUT_TARGET}
             INTERFACE
-            ${LIBBPF_LIBRARIES}
-            ${ZLIB_LIBRARIES}
-            ${LIBELF_LIBRARIES})
+                ${LIBBPF_LIBRARIES}
+                ${ZLIB_LIBRARIES}
+                ${LIBELF_LIBRARIES})
 endmacro()

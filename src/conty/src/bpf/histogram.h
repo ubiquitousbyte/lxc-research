@@ -18,6 +18,4 @@ struct bench_hist {
     __u32 slots[BENCH_HIST_MAX_SLOTS];
 };
 
-void print_log2_hist(unsigned int *vals, int vals_size, const char *val_type);
-
 #endif //CONTY_HISTOGRAM_H

@@ -29,7 +29,7 @@ func TestBridgeHookOnContainerCreating(t *testing.T) {
 
 	hook := &BridgeHook{
 		Bridge: "brcc1",
-		Addresses: []*net.IPNet{
+		ContainerAddresses: []*net.IPNet{
 			{
 				IP:   net.IPv4(192, 168, 168, 1),
 				Mask: net.IPv4Mask(255, 255, 255, 0),

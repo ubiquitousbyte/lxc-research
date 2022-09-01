@@ -4,8 +4,8 @@
 #include <bpf/bpf_tracing.h>
 
 #include "scale.bpf.h"
-#include "vfslatency.bpf.h"
 #include "histogram.h"
+#include "fs.h"
 
 const volatile pid_t target_pid = 0;
 

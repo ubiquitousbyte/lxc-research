@@ -10,13 +10,12 @@ set(CMAKE_C_EXTENSIONS ON)
 string(APPEND CMAKE_C_FLAGS "-D_GNU_SOURCE")
 
 # Dependencies
-#include(dependencies/libjsonc.cmake)
-include(dependencies/libbpf.cmake)
-include(dependencies/bpftool.cmake)
+include(dependencies/libjsonc.cmake)
+#include(dependencies/iperf3.cmake)
 
 # Modules
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/modules)
+#list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/modules)
 
-#add_subdirectory(lib)
+add_subdirectory(lib)
 add_subdirectory(src)
 #add_subdirectory(tests)

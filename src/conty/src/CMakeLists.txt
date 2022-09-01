@@ -4,11 +4,44 @@ project(conty-bench
         DESCRIPTION "Container benchmarking tool using eBPF tracing"
         LANGUAGES C)
 
-find_package(BpfGen REQUIRED)
+set(ROOTFS_BASE_DIR ${CMAKE_CURRENT_BINARY_DIR}/rootfs)
 
-add_bpf_skeleton(tcplatency tcplatency.bpf.c)
-add_bpf_skeleton(rqlatency rqlatency.bpf.c)
-add_bpf_skeleton(vfslatency vfslatency.bpf.c)
+add_custom_command(
+        OUTPUT
+            ${ROOTFS_BASE_DIR}/net
+        WORKING_DIRECTORY
+            ${CMAKE_CURRENT_LIST_DIR}
+        COMMAND
+            bash net-rootfs.sh ${ROOTFS_BASE_DIR} net)
+add_custom_target(net-rootfs DEPENDS ${ROOTFS_BASE_DIR}/net)
 
-add_executable(conty-bench bench.c bench.h histogram.h tcplatency.h tcplatency.c resource.h log.h log.c tick.h tick.c rqlatency.h rqlatency.c vfslatency.c vfslatency.h histogram.c)
-target_link_libraries(conty-bench tcplatency_skel rqlatency_skel vfslatency_skel)
+add_custom_command(
+        OUTPUT
+            ${CMAKE_CURRENT_BINARY_DIR}/net-hook
+        WORKING_DIRECTORY
+            ${CMAKE_CURRENT_LIST_DIR}/hooks/cmd/network
+        COMMAND
+            CGO_ENABLED=0 go build -o ${CMAKE_CURRENT_BINARY_DIR}/net-hook)
+add_custom_target(net-hook DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/net-hook)
+
+#add_subdirectory(bpf)
+
+add_executable(conty-netbench net.c)
+target_link_libraries(conty-netbench conty)
+configure_file(${CMAKE_CURRENT_LIST_DIR}/net-config.json ${CMAKE_CURRENT_BINARY_DIR} COPYONLY)
+add_dependencies(conty-netbench net-rootfs net-hook)
+
+
+add_custom_command(
+        OUTPUT
+            ${ROOTFS_BASE_DIR}/io
+        WORKING_DIRECTORY
+            ${CMAKE_CURRENT_LIST_DIR}
+        COMMAND
+            bash io-rootfs.sh ${ROOTFS_BASE_DIR} io)
+add_custom_target(io-rootfs DEPENDS ${ROOTFS_BASE_DIR}/io)
+
+add_executable(conty-iobench io.c)
+target_link_libraries(conty-iobench conty)
+configure_file(${CMAKE_CURRENT_LIST_DIR}/io-config.json ${CMAKE_CURRENT_BINARY_DIR} COPYONLY)
+add_dependencies(conty-iobench io-rootfs)

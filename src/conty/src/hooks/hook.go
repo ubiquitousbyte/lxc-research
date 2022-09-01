@@ -1,6 +1,8 @@
 package hooks
 
-import "io"
+import (
+	"io"
+)
 
 type Hook interface {
 	OnContainerCreating(state ContainerState) error

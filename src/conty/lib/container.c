@@ -200,6 +200,11 @@ void conty_container_set_status(struct conty_container *cc,
     cc->cc_status = status;
 }
 
+pid_t conty_container_pid(const struct conty_container *cc)
+{
+    return cc->cc_pid;
+}
+
 conty_container_status_t conty_container_status(const struct conty_container *container)
 {
     return container->cc_status;

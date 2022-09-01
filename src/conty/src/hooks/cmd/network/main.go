@@ -26,9 +26,11 @@ func (i *ipAddresses) String() string {
 }
 
 var (
-	module string
-	bridge string
-	ips    ipAddresses
+	module       string
+	bridge       string
+	bridgeIps    ipAddresses
+	containerIps ipAddresses
+	deleteBridge bool
 )
 
 func main() {
@@ -44,7 +46,9 @@ func main() {
 		"",
 		"The name of the bridge to connect the container to",
 	)
-	flag.Var(&ips, "ip", "IP address of the form <ip>/<prefix>")
+	flag.Var(&bridgeIps, "bridge-ips", "IP addresses of the form <ip>/<prefix>")
+	flag.Var(&containerIps, "container-ips", "IP addresses of the form <ip>/<prefix>")
+	flag.BoolVar(&deleteBridge, "delete-bridge", false, "Delete bridge if the container stops")
 	flag.Parse()
 
 	var hook hooks.Hook
@@ -54,7 +58,11 @@ func main() {
 		if bridge == "" {
 			log.Fatal("shared-bridge module requires bridge-name to be specified")
 		}
-		hook = &hooks.BridgeHook{Bridge: bridge, Addresses: ips}
+		hook = &hooks.BridgeHook{
+			Bridge:             bridge,
+			BridgeAddresses:    bridgeIps,
+			ContainerAddresses: containerIps,
+		}
 	default:
 		log.Fatalf("module %s not supported", module)
 	}

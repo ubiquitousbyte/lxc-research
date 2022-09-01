@@ -5,6 +5,8 @@
 extern "C" {
 #endif
 
+#include <unistd.h>
+
 typedef enum {
     CONTY_CREATING = 0,
     CONTY_CREATED  = 1,
@@ -19,6 +21,7 @@ int conty_container_kill(struct conty_container *container, int sig);
 int conty_container_delete(struct conty_container *container);
 void conty_container_free(struct conty_container *container);
 int conty_container_pollfd(const struct conty_container *cc);
+pid_t conty_container_pid(const struct conty_container *cc);
 void conty_container_set_status(struct conty_container *cc,
                                 conty_container_status_t status);
 conty_container_status_t conty_container_status(const struct conty_container *container);

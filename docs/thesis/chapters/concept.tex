@@ -209,21 +209,82 @@ a signal.
 Benchmarking is a tool to test performance in a controlled way, allowing different 
 system and software configurations to be compared and analysed.
 
-Our primary goal is to measure the overhead associated with isolating a process from the host system 
-
-
 \subsection{Functional requirements}
-
-\subsection{Non-functional requirements}
 \begin{enumerate}[i]
-    \item The benchmark must be repeatable to facilitate comparisons
-    \label{requirements:non-functional/benchmark/1}
-    \item The benchmark must be observable, either through visualisations or formatted text outputs, 
-    so that it can be analysed
-    \label{requirements:non-functional/benchmark/2}
-    \end{enumerate}
-\subsection{Methodology}
+    \item The benchmark must facilitate the collection of performance metrics in native and containerised environments.
+    \label{requirements:functional/benchmark/1} 
+    \item The benchmark must aggregate and compare metrics in native and containerised environments to 
+    enable the detection of isolation overheads.
+    \label{requirements:functional/benchmark/2}
+    \item The benchmark must produce observable results, either through visualisations or formatted text outputs,
+    so that they can be analysed.
+    \label{requirements:functional/benchmark/3}
+    \item The benchmark must expose a command-line interface that allows users to define their own 
+    container and sampling configurations.
+    \label{requirements:functional/benchmark/4}
+\end{enumerate}
 
-\subsection{Workloads}
+\subsection{Workloads \& Metrics}
+A workload is an application aimed at stressing a particular path of execution. 
+Workloads are executed within an environment, e.g a container or on the host.
+While the workload is running, a set of tracepoints accumulate performance counters relevant to that 
+path of execution, which are then aggregated into statistics. 
+The tracing procedures may be embedded in the workload itself, or as an external application. 
 
-\subsection{Command-line interface}
+The tracepoints focus on building accurate representations of two variables - latency and throughput. 
+The former is a measure of the time spent waiting for a particular resource. The latter 
+is a measure of the number of operations than a resource can process per unit of time.
+The benchmark tool, or the workload itself, attaches tracepoints to resources 
+that are namespaced by the kernel and gathers information while the workload is running inside 
+the container. Afterwards, the same statistics are gathered by executing the workload again, but this time 
+as a native application absent of a noninterference boundary constructed by the container runtime. 
+The difference in latency and throughput between both runs acts as an approximation of the isolation 
+overhead introduced by sandboxing the workload. In Chapter X.X, this approximation will be used 
+to evaluate a set of hypotheses. 
+
+In this section, the workloads and the performance counters associated with them are described. 
+
+\subsubsection{Network workload}
+The goal of this workload is to measure the overhead of data transmission between 
+two separate network namespaces. The workload consists of a client and a server that communicate 
+via TCP or UDP. The benchmark tool allows users to specify the execution environment of both the client 
+and the server. Hence, both can be deployed in two separate containers, each having a dedicated
+virtual ethernet cable attached to a bridge device on the host that switches packets between them.
+Alternatively, one of the components can run 
+in the root network namespace, i.e directly on the host system. A third option is to have both 
+the client and the server run on the host system without a bridge device between them. This is how 
+native applications communicate - by being attached to the same network interface. 
+
+The workload begins by starting the server and then the client. The client begins sending out as many 
+data chunks of size $b$ as possible during equally-spaced intervals of $n$ seconds for a total 
+duration of $t$ seconds.
+During the data exchange procedure, the client keeps track of round-trip time, the number 
+of bytes transfered, the bits transferred per second, and the number of retransmissions for each interval $n$. 
+The caller configures $b$, $n$ and $t$. In additon, the caller is allowed to configure the number 
+of parallel connections betwen the client and the server. In that case, the aforementioned 
+statistics will be tracked for each connection. Increasing the number of connections can be used to
+determine the degree of saturation, i.e how many connection are necessary to 
+observe increases in latency and decreases in throughput due to throttling.
+The workload also keeps a summary of the total user and system time it spends on the processing units,
+both for the client and the server.
+
+Note that the number of retransmissions and the round-trip time are metrics that are tracked only 
+for TCP because they are intrinsic to the protocol implementation in order to detect data loss 
+and retransmit packets accordingly. Conversely, UDP is unreliable and does not maintain such information. 
+Lost data and out of order packets must be handled at the application level.
+
+Round-trip time is this workload's latency metric. 
+It is an approximation of the amount of time it takes to send a packet 
+to the server plus the time it takes to receive the acknowledgement of that packet. 
+The round-trip time is a value maintained by the kernel's TCP implementation.
+The number of bytes transferred during the interval is this workload's throughput metric.
+It shows how much data can be forwarded from one network namespace to another via the bridge
+and its slave devices. This value is accumulated in user-space, whenever the \verb|read()| system call 
+finishes on the receiver's end the counter is incremented.
+The number of retransmissions acts as a bias for the throughput metric, because retransmitted 
+packets are also accounted for in the number of bytes transfered. They, however, do not introduce 
+new data into the network, but rather ensure reliability.
+
+\subsubsection{Filesystem workload}
+
+\subsubsection{Processing workload}

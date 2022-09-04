@@ -45,3 +45,6 @@ add_executable(conty-iobench io.c)
 target_link_libraries(conty-iobench conty)
 configure_file(${CMAKE_CURRENT_LIST_DIR}/io-config.json ${CMAKE_CURRENT_BINARY_DIR} COPYONLY)
 add_dependencies(conty-iobench io-rootfs)
+
+add_executable(conty-runtime runtime.c hash.h runtime.h)
+target_link_libraries(conty-runtime conty)

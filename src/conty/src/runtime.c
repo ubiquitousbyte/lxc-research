@@ -298,7 +298,7 @@ int conty_rt_run(struct conty_rt *rt)
     se.ev_fd = rt->rt_server.rts_fd;
     se.ev_cc = NULL;
 
-    if (conty_rt_server_listen(&rt->rt_server) != 0)
+    if ((err = conty_rt_server_listen(&rt->rt_server)) != 0)
         goto out;
 
     err = conty_rt_loop_add_fd(rt->rt_loop, se.ev_fd, EPOLLIN, &se);
@@ -320,10 +320,10 @@ int conty_rt_run(struct conty_rt *rt)
                 if (cur->ev_cc) {
                     LOG_INFO("Reaping container %s", conty_container_id(cur->ev_cc));
 
-                    if (conty_rt_reap_container(cur->ev_cc) != 0)
-                        return -1;
+                    if ((err = conty_rt_reap_container(cur->ev_cc)) != 0)
+                        return err;
 
-                    if (conty_rt_loop_del_fd(rt->rt_loop, cur->ev_fd) != 0)
+                    if ((err = conty_rt_loop_del_fd(rt->rt_loop, cur->ev_fd)) != 0)
                         return -1;
 
                     conty_rt_event_free(cur);
@@ -383,7 +383,7 @@ int conty_rt_run(struct conty_rt *rt)
     }
 out:
     conty_rt_event_free(new);
-    return -1;
+    return err;
 }
 
 void conty_rt_free(struct conty_rt *rt)
@@ -503,8 +503,9 @@ static int conty_rt_delete_container(struct conty_rt *rt,
 
 int main(int argc, char *argv[])
 {
+    int err;
     if (argc != 2)
-        goto fail;
+        return EXIT_FAILURE;
 
     if (signal(SIGINT, sig_int) == SIG_ERR)
         return log_error_ret(EXIT_FAILURE, "cannot set signal handler");
@@ -515,9 +516,9 @@ int main(int argc, char *argv[])
     if (conty_rt_init(&rt, socket_path) != 0)
         return log_error_ret(EXIT_FAILURE, "cannot initialise runtime");
 
-    conty_rt_run(&rt);
+    err = conty_rt_run(&rt);
 
     conty_rt_free(&rt);
-fail:
-    return EXIT_FAILURE;
+
+    return (err != 0) ? EXIT_FAILURE : EXIT_SUCCESS;
 }

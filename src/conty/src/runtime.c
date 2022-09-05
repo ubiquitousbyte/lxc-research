@@ -10,11 +10,7 @@
 
 #include "hash.h"
 #include "runtime.h"
-
-#ifndef P_PIDFD
-// See https://elixir.bootlin.com/linux/v5.16.9/source/include/uapi/linux/wait.h
-#define P_PIDFD 3
-#endif
+#include "log.h"
 
 #define MAX_EVENTS 256
 
@@ -27,6 +23,13 @@
         __internal__ret;                                                      \
     })
 
+static volatile sig_atomic_t exiting = 0;
+
+static void sig_int(int signo)
+{
+    exiting = 1;
+}
+
 struct conty_rt_event {
     int                     ev_fd;
     struct conty_container *ev_cc;
@@ -38,7 +41,7 @@ static struct conty_rt_event *conty_rt_event_create(void)
 
     event = malloc(sizeof(struct conty_rt_event));
     if (!event)
-        return NULL;
+        return log_error_ret(NULL, "out of memory");
 
     event->ev_fd = -EBADF;
     event->ev_cc = NULL;
@@ -83,12 +86,12 @@ int conty_rt_server_init(struct conty_rt_server *server, const char *path)
 
     unixfd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if (unixfd < 0)
-        return -errno;
+        return log_error_ret(-errno, "cannot create socket server at %s", path);
 
     if (bind(unixfd, (struct sockaddr *) addr, sizeof(*addr)) != 0) {
         err = -errno;
         close(unixfd);
-        return err;
+        return log_error_ret(err, "cannot bind socket server to %s", path);
     }
 
     server->rts_fd = unixfd;
@@ -211,6 +214,8 @@ static int conty_rt_request_read(struct conty_rt_server_buf *req, int cfd)
     if (!tok || (req->sb_op = conty_request_op_from_str(tok)) < CONTY_RT_CREATE)
         return -EOPNOTSUPP;
 
+    LOG_INFO("Received request %s", tok);
+
     req->sb_container_id = strtok_r(NULL, " ", &save_ptr);
     if (!req->sb_container_id)
         return -ESRCH;
@@ -300,7 +305,7 @@ int conty_rt_run(struct conty_rt *rt)
     if (err < 0)
         goto out;
 
-    for ( ;; ) {
+    while (!exiting) {
         nfds = epoll_wait(rt->rt_loop, events, MAX_EVENTS, -1);
         if (nfds < 0) {
             if (errno == EINTR)
@@ -313,6 +318,8 @@ int conty_rt_run(struct conty_rt *rt)
                 cur = (struct conty_rt_event *) events[i].data.ptr;
 
                 if (cur->ev_cc) {
+                    LOG_INFO("Reaping container %s", conty_container_id(cur->ev_cc));
+
                     if (conty_rt_reap_container(cur->ev_cc) != 0)
                         return -1;
 
@@ -324,6 +331,8 @@ int conty_rt_run(struct conty_rt *rt)
                 }
 
                 if (cur->ev_fd == rt->rt_server.rts_fd) {
+                    LOG_INFO("Accepting connection");
+
                     new = conty_rt_event_create();
                     if (!new) {
                         goto out;
@@ -497,11 +506,14 @@ int main(int argc, char *argv[])
     if (argc != 2)
         goto fail;
 
+    if (signal(SIGINT, sig_int) == SIG_ERR)
+        return log_error_ret(EXIT_FAILURE, "cannot set signal handler");
+
     const char *socket_path = argv[1];
     struct conty_rt rt;
 
     if (conty_rt_init(&rt, socket_path) != 0)
-        goto fail;
+        return log_error_ret(EXIT_FAILURE, "cannot initialise runtime");
 
     conty_rt_run(&rt);
 

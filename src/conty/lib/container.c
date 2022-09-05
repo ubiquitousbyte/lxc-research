@@ -205,6 +205,11 @@ pid_t conty_container_pid(const struct conty_container *cc)
     return cc->cc_pid;
 }
 
+const char *conty_container_id(const struct conty_container *cc)
+{
+    return cc->cc_id;
+}
+
 conty_container_status_t conty_container_status(const struct conty_container *container)
 {
     return container->cc_status;

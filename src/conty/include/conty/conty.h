@@ -20,6 +20,7 @@ int conty_container_start(struct conty_container *container);
 int conty_container_kill(struct conty_container *container, int sig);
 int conty_container_delete(struct conty_container *container);
 void conty_container_free(struct conty_container *container);
+const char *conty_container_id(const struct conty_container *cc);
 int conty_container_pollfd(const struct conty_container *cc);
 pid_t conty_container_pid(const struct conty_container *cc);
 void conty_container_set_status(struct conty_container *cc,

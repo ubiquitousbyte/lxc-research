@@ -4,7 +4,7 @@ project(conty-runtime
         DESCRIPTION "Container runtime server"
         LANGUAGES C)
 
-add_executable(conty-runtime runtime.c hash.h runtime.h)
+add_executable(conty-runtime runtime.c hash.h runtime.h log.c log.h)
 target_link_libraries(conty-runtime conty)
 target_include_directories(conty-runtime
         INTERFACE

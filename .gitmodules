@@ -1,6 +1,0 @@
-[submodule "src/conty/vendor/libbpf"]
-	path = src/conty/vendor/libbpf
-	url = https://github.com/libbpf/libbpf.git
-[submodule "src/conty/vendor/bpftool"]
-	path = src/conty/vendor/bpftool
-	url = https://github.com/libbpf/bpftool

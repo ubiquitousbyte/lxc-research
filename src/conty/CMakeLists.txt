@@ -4,18 +4,21 @@ project(conty
     DESCRIPTION "Basic container runtime for Linux"
     LANGUAGES C CXX)
 
-set(CMAKE_C_STANDARD 99)
-set(CMAKE_C_STANDARD_REQUIRED ON)
-set(CMAKE_C_EXTENSIONS ON)
-string(APPEND CMAKE_C_FLAGS "-D_GNU_SOURCE")
+include(GNUInstallDirs)
+include(ExternalProject)
+include(FetchContent)
 
-# Dependencies
-include(dependencies/libjsonc.cmake)
-#include(dependencies/iperf3.cmake)
+FetchContent_Declare(json-c
+        GIT_REPOSITORY https://github.com/json-c/json-c.git
+        GIT_TAG 2f2ddc1f2dbca56c874e8f9c31b5b963202d80e7)
+FetchContent_MakeAvailable(json-c)
 
-# Modules
-#list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/modules)
+set(CONTY_PUBLIC_HEADERS ${CMAKE_CURRENT_LIST_DIR}/include)
 
+# Bring in library and executable targets
 add_subdirectory(lib)
 add_subdirectory(src)
-#add_subdirectory(tests)
+
+install(DIRECTORY ${CONTY_PUBLIC_HEADERS}/conty
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(TARGETS conty conty-runtime)

@@ -32,13 +32,13 @@ target_sources(conty
         container.h
         container.c
     PUBLIC
-        ../include/conty/conty.h)
+        ${CONTY_PUBLIC_HEADERS}/conty/conty.h)
+        #$<BUILD_INTERFACE:${CONTY_PUBLIC_HEADERS}/conty/conty.h>
+        #$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/conty/conty.h>)
 
-# We want our test executables to have access to private interfaces
-# so we add a flag to enable this during the build process
 target_include_directories(conty
         PUBLIC
-            ../include
-            "$<BUILD_INTERFACE:$<$<BOOL:$<TARGET_PROPERTY:TEST>>:${CMAKE_CURRENT_LIST_DIR}>>")
+            $<BUILD_INTERFACE:${CONTY_PUBLIC_HEADERS}>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
 target_link_libraries(conty PRIVATE json-c)

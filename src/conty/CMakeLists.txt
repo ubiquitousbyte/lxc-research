@@ -21,4 +21,4 @@ add_subdirectory(src)
 
 install(DIRECTORY ${CONTY_PUBLIC_HEADERS}/conty
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-install(TARGETS conty conty-runtime)
+install(TARGETS conty conty-runner)

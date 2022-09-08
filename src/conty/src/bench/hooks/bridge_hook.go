@@ -33,6 +33,7 @@ func (b *BridgeHook) OnContainerCreating(state ContainerState) error {
 	br, err := getBridge(b.Bridge)
 	if err != nil {
 		if err != ErrBridgeNotFound {
+			fmt.Println("Cannot get bridge device")
 			return err
 		}
 
@@ -44,6 +45,7 @@ func (b *BridgeHook) OnContainerCreating(state ContainerState) error {
 			},
 		}
 		if err = netlink.LinkAdd(br); err != nil {
+			fmt.Println("Cannot add bridge device")
 			return err
 		}
 		created = true
@@ -57,11 +59,13 @@ func (b *BridgeHook) OnContainerCreating(state ContainerState) error {
 		for _, addr := range b.BridgeAddresses {
 			nlAddr := &netlink.Addr{IPNet: addr}
 			if err := netlink.AddrAdd(br, nlAddr); err != nil {
+				fmt.Println("Cannot add address to bridge device")
 				return err
 			}
 		}
 
 		if err = netlink.LinkSetUp(br); err != nil {
+			fmt.Println("Cannot set bridge device up")
 			return err
 		}
 	}
@@ -86,7 +90,10 @@ func (b *BridgeHook) OnContainerCreating(state ContainerState) error {
 		}
 	}()
 
+	fmt.Printf("Creating veth device %s", hostName)
+
 	if err = netlink.LinkAdd(veth); err != nil {
+		fmt.Println("Cannot add veth device")
 		return err
 	}
 
@@ -94,6 +101,7 @@ func (b *BridgeHook) OnContainerCreating(state ContainerState) error {
 	// bridge. This makes network communication between the container
 	// and all peers connected to the bridge possible, at least at layer 2
 	if err = netlink.LinkSetMaster(veth, br); err != nil {
+		fmt.Println("Cannot set link master of veth device")
 		return err
 	}
 
@@ -102,10 +110,12 @@ func (b *BridgeHook) OnContainerCreating(state ContainerState) error {
 	// move it into the container's network namespace
 	peer, err := netlink.LinkByName(peerName)
 	if err != nil {
+		fmt.Println("Cannot get veth device")
 		return err
 	}
 
 	if err = netlink.LinkSetNsPid(peer, state.Pid); err != nil {
+		fmt.Println("Cannot get namespace pid")
 		return err
 	}
 
@@ -113,20 +123,36 @@ func (b *BridgeHook) OnContainerCreating(state ContainerState) error {
 	// ethernet device to eth0, and add all IP addresses to the device
 	err = DoInContainerNamespace(state.Pid, unix.CLONE_NEWNET, func() error {
 		// Rename the virtual ethernet device to eth0
-		if err := netlink.LinkSetName(peer, "eth0"); err != nil {
-			return err
-		}
+		//if err := netlink.LinkSetName(peer, "eth0"); err != nil {
+		//	fmt.Println("Cannot set name to eth0")
+		//	return err
+		//}
 
 		// Add all IP addresses to the device
 		for _, addr := range b.ContainerAddresses {
 			nlAddr := &netlink.Addr{IPNet: addr}
 			if err := netlink.AddrAdd(peer, nlAddr); err != nil {
+				fmt.Println("Cannot add address to veth device")
 				return err
 			}
 		}
 
-		// Bring the device up
-		return netlink.LinkSetUp(peer)
+		localhost, err := netlink.LinkByName("lo")
+		if err != nil {
+			fmt.Println("Cannot get loopback")
+			return err
+		}
+
+		if err = netlink.LinkSetUp(localhost); err != nil {
+			fmt.Println("Cannot set loopback up")
+			return err
+		}
+
+		if err = netlink.LinkSetUp(peer); err != nil {
+			fmt.Println("Cannot set veth device up")
+		}
+
+		return err
 	})
 
 	if err != nil {
@@ -134,7 +160,10 @@ func (b *BridgeHook) OnContainerCreating(state ContainerState) error {
 	}
 
 	// Bring the host end's pair of the veth cable up
-	err = netlink.LinkSetUp(veth)
+	if err = netlink.LinkSetUp(veth); err != nil {
+		fmt.Println("Cannot set veth device up on host")
+	}
+
 	return err
 }
 

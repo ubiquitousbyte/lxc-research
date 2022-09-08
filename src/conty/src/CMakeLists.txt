@@ -10,3 +10,6 @@ target_include_directories(conty-runtime
         INTERFACE
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
             $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+
+add_executable(conty-runner conty.c)
+target_link_libraries(conty-runner conty)

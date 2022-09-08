@@ -1,0 +1,26 @@
+set terminal pdf
+set output 'throughput.pdf'
+set datafile separator " "
+
+#set xdata time
+#set timefmt "%H:%M:%S"
+set xlabel "Time (sec)"
+#set yrange [0:*]
+#set format x '%S'
+
+#set autoscale
+
+set ylabel "Mbps"
+#set format y "%s"
+set yrange [0:*]; #set ytics(0,20,40,60,80,100,120,140,160,180,200,220,240,260,280,300)
+
+set title "Throughput over time"
+set key reverse Left outside
+set grid
+
+set style data lines
+
+
+FILES = system("ls -1 *.dat")
+plot for [data in FILES] data u 2:5 with lines title data
+

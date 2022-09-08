@@ -1,0 +1,5 @@
+FROM debian:stable-slim 
+
+RUN apt update && apt install python3-pip fio -y && apt clean && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install fio-plot 

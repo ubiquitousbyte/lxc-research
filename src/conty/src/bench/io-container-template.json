@@ -1,0 +1,56 @@
+{
+    "process": {
+        "args": [
+            "bench-fio",
+            "--type=file",
+            "--target=/test-file",
+            "--size=2G",
+            "--output=/results",
+            "--block-size=4k",
+            "--numjobs=1",
+            "--iodepth=16",
+            "--engine=sync",
+            "--mode=read"
+        ],
+        "cwd": "/usr/local/bin"
+    },
+    "root": {
+        "path": "",
+        "readonly": false
+    },
+    "namespaces": [
+        {
+            "type": "user"
+        },
+        {
+            "type": "net"
+        },
+        {
+            "type": "ipc"
+        },
+        {
+            "type": "mnt"
+        },
+        {
+            "type": "uts"
+        },
+        {
+            "type": "pid"
+        }
+    ],
+    "uid_mappings": [
+        {
+            "container_id": 0,
+            "host_id": 1000,
+            "size": 1
+        }
+    ],
+    "gid_mappings": [
+        {
+            "container_id": 0,
+            "host_id": 1000,
+            "size": 1
+        }
+    ],
+    "hostname": "conty-iobench"
+}

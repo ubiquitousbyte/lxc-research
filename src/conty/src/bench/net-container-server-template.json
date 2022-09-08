@@ -1,0 +1,83 @@
+{
+  "process": {
+    "args": [
+      "iperf3",
+      "-s",
+      "192.168.168.2"
+    ],
+    "cwd": "/usr/bin"
+  },
+  "root": {
+    "path": "./rootfs/net",
+    "readonly": false
+  },
+  "namespaces": [
+    {
+      "type": "user"
+    },
+    {
+      "type": "net"
+    },
+    {
+      "type": "ipc"
+    },
+    {
+      "type": "mnt"
+    },
+    {
+      "type": "uts"
+    },
+    {
+      "type": "pid"
+    }
+  ],
+  "uid_mappings": [
+    {
+      "container_id": 0,
+      "host_id": 1000,
+      "size": 1
+    }
+  ],
+  "gid_mappings": [
+    {
+      "container_id": 0,
+      "host_id": 1000,
+      "size": 1
+    }
+  ],
+  "hostname": "conty-netbench",
+  "hooks": {
+    "on_runtime_create": [
+      {
+        "path": "./hooks/bin/net-hook",
+        "args": [
+          "net-hook",
+          "-module",
+          "shared-bridge",
+          "-bridge-name",
+          "br0",
+          "-bridge-ips",
+          "192.168.168.1/24",
+          "-container-ips",
+          "192.168.168.2/24"
+        ],
+        "timeout": 2
+      }
+    ],
+    "on_container_stopped": [
+      {
+        "path": "./hooks/bin/net-hook",
+        "args": [
+          "net-hook",
+          "-module",
+          "shared-bridge",
+          "-bridge-name",
+          "br0",
+          "-delete-bridge",
+          "true"
+        ],
+        "timeout": 2
+      }
+    ]
+  }
+}

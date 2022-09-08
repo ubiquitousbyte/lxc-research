@@ -113,9 +113,11 @@ int main(int argc, char *argv[])
     if (sigprocmask(SIG_BLOCK, &mask, NULL) < 0)
         return 1;
 
-    cc = conty_container_create("fio-bench", args.ca_bundle);
+    cc = conty_container_create(args.ca_name, args.ca_bundle);
     if (!cc)
         return 1;
+
+    conty_container_set_status(cc, CONTY_CREATED);
 
     container_fd = conty_container_pollfd(cc);
     container_pid = conty_container_pid(cc);
@@ -132,6 +134,8 @@ int main(int argc, char *argv[])
     if (conty_container_start(cc) != 0)
         goto close_sigfd;
 
+    conty_container_set_status(cc, CONTY_RUNNING);
+
     for ( ;; ) {
         ready = poll(pollfds, 2, (int) args.ca_timeout);
         if (ready <= 0)
@@ -139,6 +143,7 @@ int main(int argc, char *argv[])
 
         if (pollfds[CONTY_CONTFD].revents & POLLIN) {
             waitpid(container_pid, NULL, 0);
+            conty_container_set_status(cc, CONTY_STOPPED);
             close(sigfd);
             conty_container_delete(cc);
             return 0;
@@ -152,6 +157,7 @@ close_sigfd:
     close(sigfd);
 kill_container:
     conty_container_kill(cc, SIGKILL);
+    conty_container_set_status(cc, CONTY_STOPPED);
     conty_container_delete(cc);
     return 0;
 }

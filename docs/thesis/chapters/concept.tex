@@ -274,7 +274,7 @@ In this section, the workloads and the performance counters associated with them
 \subsubsection{Network workload}
 The goal of this workload is to measure the overhead of data transmission between 
 two separate network namespaces. The workload consists of a client and a server that communicate 
-via TCP or UDP. The benchmark tool allows users to specify the execution environment of both the client 
+via TCP or UDP. Users to specify the execution environment of both the client 
 and the server. Hence, both can be deployed in two separate containers, each having a dedicated
 virtual ethernet cable attached to a bridge device on the host that switches packets between them.
 Alternatively, one of the components can run 
@@ -308,10 +308,50 @@ The number of bytes transferred during the interval is this workload's throughpu
 It shows how much data can be forwarded from one network namespace to another via the bridge
 and its slave devices. This value is accumulated in user-space, whenever the \verb|read()| system call 
 finishes on the receiver's end the counter is incremented.
-The number of retransmissions acts as a bias for the throughput metric, because retransmitted 
-packets are also accounted for in the number of bytes transfered. They, however, do not introduce 
-new data into the network, but rather ensure reliability.
+The number of retransmissions acts as a robustness metric for the network itself.
+It also has a statistical relationship with throughput.
+Higher retransmission counts may have a negative impact on throughput.
 
 \subsubsection{Filesystem workload}
+The purpose of this workload is to detect and analyse differences in latency and throughput in 
+different mount namespaces. In particular, we want to compare these metrics when running the 
+workload within the root mount namespace and a container mount namespace. 
+
+The workload executes operations on a single file. Users can define the I/O pattern issued to the file,
+e.g performing only sequential reads, writing to the file at random file offsets, using direct I/O
+in order to bypass the page cache and so on. In addition, the size of the buffers (the block size)
+can be configured. How the workload should issue the I/O operations must also be specified. 
+There are a plethora of options here. I/O operations can be synchronous, i.e employing calls to 
+\verb|read()|, \verb|write()| and \verb|lseek()| to 
+position file offsets. Alternatively, I/O operations can be asynchronous. That is, 
+the workload registers a set of event handlers for each I/O operation it wants to execute and only 
+submits requests to the kernel. The kernel does not block the calling thread. Instead,
+it notifies the application whenever the disk driver emits an interrupt that represents 
+the operation's completion. In asynchronous mode, users can configure the number of parallel 
+I/O operations. Another way of controlling parallelisation is by spawning multiple processes that 
+compete with each other. The number of processes is also configurable.
+
+Input-output operations per second (IOPS) is this workload's throughput metric.
+The metric is heavily dependant on the I/O pattern employed. 
+This work focuses on sequential reads and writes, both in synchronous and asynchronous contexts.
+For the asynchronous measurements, the number of in-flight I/O operations is controlled by 
+two mechanisms - number of processes issuing I/O operations and number of parallel I/O operations 
+by a single process. These mechanisms are used independently to ease the interpretation of the results.
+For the synchronous measurements, the level of parallelisation is controlled only through the number 
+of processes.
+
+Total latency is this workload's latency metric. The total latency is derived by summing 
+two variables - the submission latency and the completion latency. The former represents 
+the time it takes to allocate and initialise the data buffers plus a variable $a$ whose interpretation 
+depends on whether or not the underlying I/O mechanism is synchronous or not.  
+If it is, then $a = 0$. Otherwise, $a$ includes the time it takes to submit the I/O operation
+to the underlying queue of requests. The completion latency is also context-dependant. 
+In the synchronous case, it represents the time from when the input-output operation was submitted 
+to the kernel to when it was completed. In the asynchronous case, it is the time from 
+when the submission operation was completed to when the event handler that reaps the operation 
+was completed. Intuitively, synchronous operations exhibit lower submission latencies but higher 
+completion latencies. Conversely, asynchronous operations exhibit higher submission latencies 
+but lower completion latencies. Completion latencies have a stronger impact on overall 
+I/O performance, making asynchronous mechanisms more favorable for performance-critical workloads.   
 
 \subsubsection{Processing workload}

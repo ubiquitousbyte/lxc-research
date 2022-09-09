@@ -205,6 +205,33 @@ managing the container process. It does so by registering the container with an 
 polls container states and reaps processes that have terminated, which happens when the container 
 transitions into the \enquote{stopped} state - either by exiting or being manually killed by the executable through 
 a signal. 
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{images/concept/runtime-create-start-kill-sequence-diagram.jpg}
+    \caption{Sequence diagram highlighting the interaction of a client application with the runtime executable.}
+    \label{images:concept/images/concept/runtime-create-start-kill-sequence-diagram.jpg}
+\end{figure}
+
+Figure \ref{images:concept/images/concept/runtime-create-start-kill-sequence-diagram.jpg} shows 
+the commands that an external application can send to the runtime executable. The application 
+creates a streaming socket and establishes a connection to the runtime server. 
+The runtime accepts the connection and registers the socket file descriptor with the event loop. 
+Whenever the client writes data into the socket, the runtime wakes up from the suspended state and reacts to the 
+event by parsing the request and processing it. When the client requests the creation 
+of a new container, by sending \verb|create <container-name> <config-path>|, 
+the runtime calls out to the library and registers the container in a hash table. Furthermore, 
+a pollable file descriptor for that container is created and registered with the event loop. 
+When the process exits, the kernel notifies the runtime of the event, so it can reap the process accordingly.
+The runtime is responsible for keeping the container's state machine consistent with the events 
+received from the kernel, as well as the requests that come from the client.
+
+The runtime uses the \verb|epoll| family of system calls to simultaneously monitor multiple file descriptors 
+to see if any I/O is possible on any of them. It also uses a new kernel application programming interface - 
+process file descriptors, commonly abbreviated as \verb|pidfd|'s, to map process identifiers to 
+pollable objects that can be registered with an event loop. All of these concepts are explained 
+in Chapter \ref{ch:implementation}.
+
 \section{Benchmark}
 Benchmarking is a tool to test performance in a controlled way, allowing different 
 system and software configurations to be compared and analysed.

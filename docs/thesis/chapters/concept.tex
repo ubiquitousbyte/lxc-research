@@ -92,12 +92,11 @@ components use the core components to provide a
 simple interface for creating, starting, killing and deleting containers. A container 
 is represented as an opaque pointer and is only allowed to be accessed through library functions.
 
-The runtime executable uses the container component to create and manage an in-memory queue 
-of containers. Furthermore, an additional thread implements an event loop that monitors state changes of all containers 
-in the run queue and reaps their resident processes to avoid leaking identifiers.
-The main thread of execution implements a UNIX socket server that accepts requests
-from external applications, e.g the benchmark tool, to satisfy the functional requirements
-defined in the previous paragraph.
+The runtime executable uses the container component to create and manage a single container.
+It consists of an event loop that monitors state changes of the container and reaps the process 
+when it exits. In addition, it polls a signal file descriptor for itself. When the user desides 
+to kill the runtime executable, the same signal is propagated to the container, the container 
+is killed, and all resources it allocated are deleted accordingly. 
 
 When a process is detached into a new user namespace, it's real user identifier is replaced by the kernel 
 with the overflow identifier, also known as the \textit{nobody} user, which has no access to 
@@ -150,29 +149,31 @@ file that defines the container's execution environment. Code snippet \ref{code:
 is an example of such a file. In addition, this component provides a mechanism for executing an 
 arbitrary program, called a hook, that receives the container's state through its standard input stream as a JSON string.
 Hooks are provided by external applications as part of the JSON configuration file and are executed
-when a container transitions into a new state. A container's state transition diagram is shown in 
-Figure \ref{images:concept/container-state-diagram.jpg}. For each unique state transition, a set of hooks 
-gets executed. This design is defined as part of the runtime specification \cite{oci-runtime-lifecycle}.   
+when a container transitions into a new state.  This design is defined as part of the runtime specification \cite{oci-runtime-lifecycle}. 
+A container's state transition diagram is shown in Figure \ref{images:concept/container-state-diagram.jpg}.
+Table \ref{table:concept/runtime/hooks} shows the predefined set of hooks and in which execution 
+context they are executed.
 
-The synchronisation component defines an inter-process communication mechanism between 
-the container runtime and a container. The typical communication flow follows the request-response pattern - 
-one end produces a request and blocks until the other end consumes it and produces a response.
-However, to enable concurrent work, a peer can \enquote{fire} a message and forget about the response.
-The requests and responses are simple numeric values with semantic meaning. 
-
-
-%The Open Containers Initiative (OCI) component is responsible for parsing a JSON configuration 
-%file that defines the container's execution environment. Code snippet \ref{code:oci-config.json} 
-%is an example of such a file. In addition, this component provides a mechanism for executing an 
-%arbitrary program, called a hook, that receives the container's state through its standard input stream as a JSON string.
-%These hooks are 
-%This mechanism will be used by external applications to hook into well-defined points of a 
-%container's lifecycle.
-%The runtime prevents the program from temporaly interfering with it by starting a 
-%timer and killing the program if it does not complete when the timer expires.
-%Note that the synchronisation component is tightly coupled to the hook execution process. 
-%The container synchronises with the runtime at specific points of its lifecycle. At those points, 
-%a set of hooks defined by the external application is executed. 
+\begin{table}[h!]
+    \centering
+    \begin{tabular}{ |c|c|c| }
+        \hline
+        Hooks & Namespace & Triggered By \\
+        \hline
+        \verb|on_runtime_create| & Runtime namespace & \verb|EVENT_RT_CREATE| \\ % & Prepare runtime environment on the host \\
+        \hline 
+        \verb|on_container_created| & Container namespace & \verb|EVENT_CONT_CREATE| \\ %& Prepare runtime environment inside the container, before pivoting the new root filesystem  \\
+        \hline
+        \verb|on_container_start| & Container namespace & \verb|EVENT_CONT_START| \\ % & Prepare runtime environment inside the container, after pivoting but before \verb|execve| \\
+        \hline
+        \verb|on_container_started| & Runtime namespace & \verb|EVENT_CONT_STARTED| \\ %& Run a set of post-start hooks on the host \\
+        \hline
+        \verb|on_container_stopped| & Runtime namespace & \verb|SIGCHLD| \\ %& Clean up runtime environment on host, after container has exited \\
+        \hline
+    \end{tabular}
+    \caption{Table of hooks, where they are executed and what event they are triggered by.}
+    \label{table:concept/runtime/hooks}
+\end{table}
 
 \begin{figure}[H]
     \centering
@@ -180,6 +181,23 @@ The requests and responses are simple numeric values with semantic meaning.
     \caption{Sequence diagram highlighting the container creation and start operations}
     \label{images:concept/container-create-start-sequence-diagram.jpg}
 \end{figure}
+
+ The \verb|on_runtime_create| hooks are executed in the runtime namespace 
+and prepare the runtime environment on the host. These hooks are triggered after the container process 
+is cloned into a new set of namespaces. The \verb|on_container_created| hooks are executed within 
+the container namespaces in order to prepare the runtime environment inside the container.
+Note that these hooks are executed before the root filesystem is pivoted.
+The \verb|on_container_start| hooks are triggered after pivoting the root filesystem, but before 
+loading the user-defined application via \verb|execve()|. The \verb|on_container_started| hooks 
+are executed within the runtime namespaces after the \verb|execve()| is called. 
+The process is then monitored for state changes. Whenever it exits, the \verb|on_container_stopped|
+hooks are executed, whose primary task is to clean up the runtime environment on the host. 
+
+The synchronisation component defines an inter-process communication mechanism between 
+the container runtime and a container. The typical communication flow follows the request-response pattern - 
+one end produces a request and blocks until the other end consumes it and produces a response.
+However, to enable concurrent work, a peer can \enquote{fire} a message and forget about the response.
+The requests and responses are simple numeric values with semantic meaning. 
 
 The container component brings all of the core components together. The sequence diagram in 
 Figure \ref{images:concept/container-create-start-sequence-diagram.jpg} shows the procedures 
@@ -189,6 +207,7 @@ The container component reads the configuration file and allocates
 an in-memory representation for the container. It then spawns the container process, which creates 
 a freshly-allocated set of namespaces and joins already existing namespaces, depending on the namespace configuration 
 specified in the file.
+
 It then transitions into the \enquote{creating} state and notifies the runtime to execute the 
 corresponding hooks by sending an \verb|EVENT_RT_CREATE| through the synchronisation component. 
 The runtime receives the request, executes the runtime hooks, and notifies the child that it should transition 
@@ -206,31 +225,31 @@ polls container states and reaps processes that have terminated, which happens w
 transitions into the \enquote{stopped} state - either by exiting or being manually killed by the executable through 
 a signal. 
 
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.7\textwidth]{images/concept/runtime-create-start-kill-sequence-diagram.jpg}
-    \caption{Sequence diagram highlighting the interaction of a client application with the runtime executable.}
-    \label{images:concept/images/concept/runtime-create-start-kill-sequence-diagram.jpg}
-\end{figure}
+%\begin{figure}[H]
+%    \centering
+%    \includegraphics[width=0.7\textwidth]{images/concept/runtime-create-start-kill-sequence-diagram.jpg}
+%    \caption{Sequence diagram highlighting the interaction of a client application with the runtime executable.}
+%    \label{images:concept/images/concept/runtime-create-start-kill-sequence-diagram.jpg}
+%\end{figure}
 
-Figure \ref{images:concept/images/concept/runtime-create-start-kill-sequence-diagram.jpg} shows 
-the commands that an external application can send to the runtime executable. The application 
-creates a streaming socket and establishes a connection to the runtime server. 
-The runtime accepts the connection and registers the socket file descriptor with the event loop. 
-Whenever the client writes data into the socket, the runtime wakes up from the suspended state and reacts to the 
-event by parsing the request and processing it. When the client requests the creation 
-of a new container, by sending \verb|create <container-name> <config-path>|, 
-the runtime calls out to the library and registers the container in a hash table. Furthermore, 
-a pollable file descriptor for that container is created and registered with the event loop. 
-When the process exits, the kernel notifies the runtime of the event, so it can reap the process accordingly.
-The runtime is responsible for keeping the container's state machine consistent with the events 
-received from the kernel, as well as the requests that come from the client.
+%Figure \ref{images:concept/images/concept/runtime-create-start-kill-sequence-diagram.jpg} shows 
+%the commands that an external application can send to the runtime executable. The application 
+%creates a streaming socket and establishes a connection to the runtime server. 
+%The runtime accepts the connection and registers the socket file descriptor with the event loop. 
+%Whenever the client writes data into the socket, the runtime wakes up from the suspended state and reacts to the 
+%event by parsing the request and processing it. When the client requests the creation 
+%of a new container, by sending \verb|create <container-name> <config-path>|, 
+%the runtime calls out to the library and registers the container in a hash table. Furthermore, 
+%a pollable file descriptor for that container is created and registered with the event loop. 
+%When the process exits, the kernel notifies the runtime of the event, so it can reap the process accordingly.
+%The runtime is responsible for keeping the container's state machine consistent with the events 
+%received from the kernel, as well as the requests that come from the client.
 
-The runtime uses the \verb|epoll| family of system calls to simultaneously monitor multiple file descriptors 
-to see if any I/O is possible on any of them. It also uses a new kernel application programming interface - 
-process file descriptors, commonly abbreviated as \verb|pidfd|'s, to map process identifiers to 
-pollable objects that can be registered with an event loop. All of these concepts are explained 
-in Chapter \ref{ch:implementation}.
+%The runtime uses the \verb|epoll| family of system calls to simultaneously monitor multiple file descriptors 
+%to see if any I/O is possible on any of them. It also uses a new kernel application programming interface - 
+%process file descriptors, commonly abbreviated as \verb|pidfd|'s, to map process identifiers to 
+%pollable objects that can be registered with an event loop. All of these concepts are explained 
+%in Chapter \ref{ch:implementation}.
 
 \section{Benchmark}
 Benchmarking is a tool to test performance in a controlled way, allowing different 
@@ -274,7 +293,7 @@ In this section, the workloads and the performance counters associated with them
 \subsubsection{Network workload}
 The goal of this workload is to measure the overhead of data transmission between 
 two separate network namespaces. The workload consists of a client and a server that communicate 
-via TCP or UDP. Users to specify the execution environment of both the client 
+via TCP or UDP. Users have to specify the execution environment of both the client 
 and the server. Hence, both can be deployed in two separate containers, each having a dedicated
 virtual ethernet cable attached to a bridge device on the host that switches packets between them.
 Alternatively, one of the components can run 

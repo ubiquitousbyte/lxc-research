@@ -22,8 +22,43 @@ These flags are simply ORed together and passed into the system call.
 Internally, the kernel allocates a new namespace proxy and all of its namespaces 
 in a system-wide slab cache and attaches it as a pointer to the new task structure.
 Whenever a process attempts to operate on a namespaced resource, the kernel follows its reference to the 
-proxy, and the resource's reference to the namespace. If the resource is managed by the same namespace 
+proxy, and the resources' reference to the namespace. If the resource is managed by the same namespace 
 that the process is a part of, then the respective operation is permitted.
+Code snippet \ref{code:fundamentals/namespaces/process} shows an example of how clone is used 
+within the runtime implementation. The namespaces are parsed from the configuration file and 
+aggregated into a bit mask \verb|cc_ns_new|. The runtime then calls out to the \verb|clone3()| system call
+with the namespace mask set, as well as a pointer in which a pollable file descriptor for the 
+container should be populated by the kernel - \verb|cc_pollfd|. 
+
+\begin{lstlisting}[style=c-code-snippets, label={code:implementation/namespaces/clone}, caption={Container instantiation within the runtime using clone3}]
+static inline pid_t clone3(struct clone_args *args, size_t args_size)
+{
+    return (pid_t) syscall(SYS_clone3, args, args_size);
+}
+
+static int container_entrypoint(void *arg)
+{
+    struct conty_container *cc = (struct conty_container *) arg;
+    /* Configure container within new namespace set */
+}
+
+int conty_container_spawn(struct conty_container *cc)
+{
+    struct clone_args args = {
+        // cc->cc_ns_new contains
+        // CLONE_NEWIPC | CLONE_NEWPID | CLONE_NEWUSER | CLONE_NEWNS | CLONE_NEWUTS | CLONE_NEWNET
+        .flags = cc->cc_ns_new | CLONE_PIDFD;
+        .pidfd = (__u64)(uintptr_t) cc->cc_pollfd,
+    };
+
+    cc->cc_pid = clone3(&args, CLONE_ARGS_SIZE_VER2);
+    if (cc->cc_pid == 0) 
+        /* Within container */
+        _exit(container_entrypoint(cc));
+    else 
+        /* Within runtime */
+}
+\end{lstlisting}
 
 Spawning a process in a new set of namespaces is not enough to provide a secure runtime environment.
 As a matter of fact, the container's runtime environment after \verb|clone()| is insecure and unusable.
@@ -69,12 +104,15 @@ written to the file. An attacker that subsequently attempts to manipulate the ma
 be able to. Secondly, the writing process must have the \verb|CAP_SETUID| and 
 \verb|CAP_SETGID| capabilities in the root user namespace, or otherwise it can 
 write only a single entry into the file. Deciding which identifier mappings to write is a function 
-of a container engine, not the runtime. The runtime simply reads the identifier mappings to be written 
+of a container engine, not the runtime. The runtime simply reads the identifier mappings
 from a configuration file like the one defined in code snippet \ref{code:oci-config.json}, buffers 
 them in memory and dumps them to the respective map files from within the container process.
-This is the very first thing that the container process does so that  subsequent operations 
+This is the very first thing that the container process does so that subsequent operations 
 are properly authorised by the kernel. 
 
+Creating a process with the \verb|CLONE_NEWNS| flag puts it in a new mount namespace that 
+inherits a copy of the parent's mount points. This includes the parent's root mount (at \verb|/|)
+, all pseudo filesystems and device nodes.
 
 \section{Benchmark}
 \label{ch:implementation/benchmark}

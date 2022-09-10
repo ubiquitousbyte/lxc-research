@@ -4,12 +4,77 @@ and the benchmark tool.
 
 Section \ref{ch:implementation/runtime} dives deeply into the 
 system call interface of the Linux kernel that enables the creation and execution 
-of isolated workloads. The actions taken by the runtime 
-to ensure proper noninterference are also discussed. 
+of isolated workloads. This chapter also contains a qualitative evaluation of the runtime's 
+security characteristics. 
 
 \label{ch:implementation}
 \section{Runtime}
 \label{ch:implementation/runtime}
+The \verb|clone()| system call is the runtime's primary method of isolating a process.
+This system call creates a new execution context and allows the caller to configure it 
+through a bit mask. In essence, this bit mask defines the noninterference boundary between 
+the new execution context, its parent, and all other processes on the system. If the bit mask is 0, 
+the clone system call is equivalent to a simple \verb|fork()|. The runtime utilises this 
+system call for two purposes - to spawn the container process in a new set of namespaces and to 
+create a pollable process file descriptor for it. 
+Achieving the former is trivial. The kernel exposes a flag for every namespace type.
+These flags are simply ORed together and passed into the system call. 
+Internally, the kernel allocates a new namespace proxy and all of its namespaces 
+in a system-wide slab cache and attaches it as a pointer to the new task structure.
+Whenever a process attempts to operate on a namespaced resource, the kernel follows its reference to the 
+proxy, and the resource's reference to the namespace. If the resource is managed by the same namespace 
+that the process is a part of, then the respective operation is permitted.
+
+Spawning a process in a new set of namespaces is not enough to provide a secure runtime environment.
+As a matter of fact, the container's runtime environment after \verb|clone()| is insecure and unusable.
+The runtime must configure the environment depending on the namespaces that were created.  
+
+If the runtime creates a container process with the \verb|CLONE_NEWUSER| flag set, i.e in a new user namespace,
+the kernel initialises the container's security context to an unprivileged state by setting its 
+user and group identifiers to the overflow value, also known as the \enquote{nobody} user.
+This user has the least privileges on the system, making the new user namespace particularly unuseful. 
+Even if the namespace manages security-sensitive resources, such as network devices and mount points,
+the container process is considered unprivileged to access them. For this reason, the container runtime 
+has the responsibility of remapping the invalid identifiers to valid user identifiers. 
+It is particularly important to note that the remapped identifiers must refer to users within 
+the root user namespace, i.e on the host. The remapping is done by writing a range of 
+identifiers to the files \verb|/proc/[pid]/uid_map| and \verb|/proc/[pid]/gid_map| where \verb|pid|
+refers to the process identifier of the container.
+These files consist of multiple entries separated by newline characters. 
+An entry is represented by three integers - $c$, $h$ and $a$. 
+The kernel maps the half-open range of identifiers $[c, c+a)$ to $[h, h+a)$ where 
+$c$ denotes the starting identifier in the container's user namepace and $h$ denotes 
+the starting identifier in the root user namespace.
+\begin{lstlisting}[label={code:implementation/namespaces/user-example}, style=bash, caption={Example of an identifier mapping}]
+$ cat /proc/self/uid_map
+0 1000 50
+\end{lstlisting}
+Consider the example in code snippet \ref{code:implementation/namespaces/user-example}. The 
+runtime has mapped the root user in the container's user namespace to the user with identifier 1000 
+on the host. Similarly, user 1 in the container is mapped to user 1001 on the host. The same logic 
+applies to all users up to 49 and 1049 inside the container and on the host, respectively.
+If a malicious attacker gains access to a container and manages to break out of its user namespace, 
+protecting the host system depends on the identifier mapping. In the example above, the 
+attacker will still be unprivileged on the host, provided that users $(1000, 1049)$ are unprivileged.
+If, however, the runtime writes a mapping such as \verb|0 0 1|, a container escape proves critical.
+The identifier mappings of a container also have an impact on its noninterference boundary with 
+other containers. If the runtime maps the same user identifer on the host to the root user inside the user namespace of two different containers, an 
+attacker that escapes from one container will be able to enter the user namespace of the other. Upon entering,
+the attacker will have root privileges. Therefore, for a truly secure environment, two invariants must hold - 
+mapped identifier ranges must not overlap across different containers, and a privileged user on the host must 
+not be mapped to a user inside a container. The kernel imposes several restrictions to user-space for 
+writing to the map files. First, the kernel prohibits more than a single write to such a file. 
+That is, the runtime can write only once to that file. Furthermore, at least one line must be 
+written to the file. An attacker that subsequently attempts to manipulate the mappings would not 
+be able to. Secondly, the writing process must have the \verb|CAP_SETUID| and 
+\verb|CAP_SETGID| capabilities in the root user namespace, or otherwise it can 
+write only a single entry into the file. Deciding which identifier mappings to write is a function 
+of a container engine, not the runtime. The runtime simply reads the identifier mappings to be written 
+from a configuration file like the one defined in code snippet \ref{code:oci-config.json}, buffers 
+them in memory and dumps them to the respective map files from within the container process.
+This is the very first thing that the container process does so that  subsequent operations 
+are properly authorised by the kernel. 
+
 
 \section{Benchmark}
 \label{ch:implementation/benchmark}

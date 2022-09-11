@@ -120,24 +120,38 @@ are properly authorised by the kernel.
 Creating a process with the \verb|CLONE_NEWNS| flag puts it in a new mount namespace that 
 inherits a copy of the parent's mount points. This includes the parent's root mount (at \verb|/|),
 which contains various \enquote{submounts} such as the pseudo filesystems \verb|/proc| and \verb|/sys|,
+the in-memory filesystem \verb|/dev| and all of its resident device nodes,
 the POSIX message queue filesystem \verb|/dev/mqueue| and the POSIX shared-memory filesystem \verb|/dev/shm|.
 The container runtime is responsible for setting up all of these filesystems inside the new mount namespace,
-under the base directory of the container's dedicated root filesystem. Note that upon creation,
-the container's root filesystem is a simple directory, not a mount point. 
+under the base directory of the container's dedicated root filesystem. Note that upon creation, the container's root filesystem is a simple directory, not a mount point. 
 The runtime must convert it into a mount point so that it can replace the inherited root mount 
 with a new one. Therefore, the runtime bind mounts the aforementioned directory onto itself, using 
 the \verb|mount| system call. Recall from Section \ref{sections:fundamentals/namespaces/mount} 
 that every mount point is associated with a propagation type. If the parent mount of the 
 directory that holds the root filesystem has a shared propagation type, then bind mounting 
 that directory inside the container will propagate the mount event downstream to the parent mount, 
-causing the bind mount to appear in the set of mount points in the root mount namespace, i.e on the host.
+causing the bind mount to appear in the set of mount points of the root mount namespace.
 This is not desirable as it directly interferes with the host environment. For this reason, 
-the container process first remounts the old root filesystem with a propagation type set to \verb|MS_PRIVATE|
-so that any changes in the container's mount namespace are not propagated downstream. 
+the container process first remounts the old root filesystem to have a private propagation type and 
+only then performs the bind mount.
 Note that setting the propagation type to \verb|MS_SLAVE| would also work, if the container 
 wants to receive mount events from the host. This process is shown in code snippet \ref{code:implementation/namespaces/mount}.
 The variable \verb|rfs->cro_dst| holds the absolute path to the container's root filesystem.
-
+Afterwards, the runtime mounts the device filesystem as a \verb|tmpfs| instance and creates the
+five device nodes listed in Table \ref{table:implementation/runtime/devices}.
+Even though the container process is privileged in its user namespace and has the \verb|CAP_MKNOD|
+capability set, trying to create the device nodes with the \verb|mknod()| system call fails with an
+\verb|EPERM| error. Albeit an important resource inside a containerised environment, device nodes 
+are not namespaced nor owned by a user namespace. 
+Instead, the kernel resorts to authorising the operation with the user credentials in the initial 
+root namespace, which will always fail in the context of a rootless container. For this reason,
+the runtime falls back to bind mounting the devices from the host. 
+Axiomatically, the noninterference boundary for these devices is nonexistent. 
+The same semantics apply when trying to mount a block device inside a 
+rootless container. The block device must first be mounted within the root mount namespace, and 
+then bind mounted from within the container's mount namespace. This, however, weakens the 
+noninterference boundary. An attacker that escapes a container may interfere with other containers
+by manipulating the device's mount point.
 \begin{lstlisting}[style=c-code-snippets, label={code:implementation/namespaces/mount}, caption={Remounting the original root filesystem to disable mount propagation events and bind mounting the container's root filesystem onto itself.}]
 /* Error handling deliberately left out */
 mount("", "/", "", MS_PRIVATE | MS_REC, NULL);
@@ -145,6 +159,64 @@ mount(rfs->cro_dst, rfs->cro_dst, "bind", MS_BIND | MS_REC, NULL);
 mount("", rfs->cro_dst, "", MS_PRIVATE, NULL);
 \end{lstlisting}
 
+\begin{table}[h!]
+    \centering
+    \begin{tabular}{ |m{4cm}|m{20em}| }
+        \hline
+        Device & Description \\
+        \hline
+        \verb|null| & Data sink. Reads return EOF \\
+        \hline 
+        \verb|zero| & Data sink. Reads return null bytes \\
+        \hline
+        \verb|full| & Data sink/source emulating a full device. Reads return null bytes. Writes return \verb|ENOSPC| \\
+        \hline
+        \verb|random| & Random number generator gathering environmental noise from device drivers. Blocks until enough entropy is gathered. \\
+        \hline
+        \verb|urandom| & Random number generator gathering environmental noise from device drivers. Has nonblocking semantics \\
+
+        \hline
+    \end{tabular}
+    \caption{Table of mounted device nodes within a container}
+    \label{table:implementation/runtime/devices}
+\end{table}
+
+The \verb|proc| and \verb|sys| filesystems are mounted conditionally. The former presents information
+about all processes on the system. If the runtime is instructed to create a container with 
+its own isolated process identifier namespace, then it must mount a dedicated \verb|proc|
+filesystem that replaces the old one. Otherwise, process information from the host environment 
+will be leaked inside the container. Similarly, the \verb|sysfs| filesystem contains information 
+about the system's network interfaces, routes, firewall rules and so on. If the container inherits 
+this mount from the host, then networking information will be leaked. In addition, containerised 
+processes that rely on the contents of that filesystem will not work properly. Therefore, 
+the runtime replaces the old mount with a new one, provided that the user has requested a 
+new network namespace. The kernel is instructed to disallow the creation of set-user-id programs,
+executable files and device nodes within these filesystems. Write permissions are disabled 
+for all users that are not mapped to the root user within the container's user namespace. 
+After setting up all the mounts, the runtime pins the root filesystem onto the 
+root directory entry, making all filesystem entries on the host inaccessible from within the container's mount namespace.
+This is achieved through the \verb|pivot_root| system call, which moves 
+the old root mount to a location specified by the runtime and mounts the root filesystem at \verb|/|,
+as shown in code snippet \ref{code:implementation/namespaces/pivot}.
+
+\begin{lstlisting}[style=c-code-snippets, label={code:implementation/namespaces/pivot}, caption={Swap the old root filesystem with a new one}]
+/* Error handling deliberately left out */
+int old_root = -EBADF, new_root = -EBADF;
+new_root = openat(-EBADF, rfs->cro_dst, O_DIRECTORY | O_PATH | O_CLOEXEC | O_NOFOLLOW);
+old_root = openat(-EBADF, "/", O_DIRECTORY | O_PATH | O_CLOEXEC | O_NOFOLLOW);
+fchdir(new_root);
+pivot_root(".", ".");
+fchdir(old_root);
+mount("", ".", "", MS_SLAVE | MS_REC, NULL);
+umount2(".", MNT_DETACH);
+fchdir(new_root);
+\end{lstlisting}
+Note that setting 
+the old root filesystem's propagation type to \verb|MS_PRIVATE|, as shown on line 1 in code snippet 
+\ref{code:implementation/namespaces/mount}, is an absolute necessity before calling \verb|pivot_root|.
+Otherwise, unmounting the root filesystem may propagate downstream to the host, causing it to 
+unmount as well.
+    
 \section{Benchmark}
 \label{ch:implementation/benchmark}
 \subsection{Network workload}

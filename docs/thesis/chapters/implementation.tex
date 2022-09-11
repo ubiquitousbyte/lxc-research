@@ -27,8 +27,8 @@ that the process is a part of, then the respective operation is permitted.
 Code snippet \ref{code:fundamentals/namespaces/process} shows an example of how clone is used 
 within the runtime implementation. The namespaces are parsed from the configuration file and 
 aggregated into a bit mask \verb|cc_ns_new|. The runtime then calls out to the \verb|clone3()| system call
-with the namespace mask set, as well as a pointer in which a pollable file descriptor for the 
-container should be populated by the kernel - \verb|cc_pollfd|. 
+with the namespace mask set, as well as a pointer to a pollable file descriptor for the 
+container that should be populated by the kernel - \verb|cc_pollfd|. 
 
 \begin{lstlisting}[style=c-code-snippets, label={code:implementation/namespaces/clone}, caption={Container instantiation within the runtime using clone3}]
 static inline pid_t clone3(struct clone_args *args, size_t args_size)
@@ -40,6 +40,7 @@ static int container_entrypoint(void *arg)
 {
     struct conty_container *cc = (struct conty_container *) arg;
     /* Configure container within new namespace set */
+    /* At the end, call execve to load the user-defined binary */
 }
 
 int conty_container_spawn(struct conty_container *cc)
@@ -48,7 +49,7 @@ int conty_container_spawn(struct conty_container *cc)
         // cc->cc_ns_new contains
         // CLONE_NEWIPC | CLONE_NEWPID | CLONE_NEWUSER | CLONE_NEWNS | CLONE_NEWUTS | CLONE_NEWNET
         .flags = cc->cc_ns_new | CLONE_PIDFD;
-        .pidfd = (__u64)(uintptr_t) cc->cc_pollfd,
+        .pidfd = (__u64)(uintptr_t) &cc->cc_pollfd,
     };
 
     cc->cc_pid = clone3(&args, CLONE_ARGS_SIZE_VER2);
@@ -87,11 +88,17 @@ $ cat /proc/self/uid_map
 Consider the example in code snippet \ref{code:implementation/namespaces/user-example}. The 
 runtime has mapped the root user in the container's user namespace to the user with identifier 1000 
 on the host. Similarly, user 1 in the container is mapped to user 1001 on the host. The same logic 
-applies to all users up to 49 and 1049 inside the container and on the host, respectively.
+applies to all users up to 49 and 1049 inside the container and on the host, respectively. 
 If a malicious attacker gains access to a container and manages to break out of its user namespace, 
 protecting the host system depends on the identifier mapping. In the example above, the 
 attacker will still be unprivileged on the host, provided that users $(1000, 1049)$ are unprivileged.
-If, however, the runtime writes a mapping such as \verb|0 0 1|, a container escape proves critical.
+If, however, the runtime writes a mapping
+\begin{equation}
+    c = h = 0;  a = 1, \label{eq:implementation/root-mapping}
+\end{equation}
+a container escape proves critical.
+The mapping in (\ref{eq:implementation/root-mapping}) is the default one for containers created by the Docker engine, necessitating
+additional configurations to enable rootless containers.
 The identifier mappings of a container also have an impact on its noninterference boundary with 
 other containers. If the runtime maps the same user identifer on the host to the root user inside the user namespace of two different containers, an 
 attacker that escapes from one container will be able to enter the user namespace of the other. Upon entering,
@@ -107,12 +114,36 @@ write only a single entry into the file. Deciding which identifier mappings to w
 of a container engine, not the runtime. The runtime simply reads the identifier mappings
 from a configuration file like the one defined in code snippet \ref{code:oci-config.json}, buffers 
 them in memory and dumps them to the respective map files from within the container process.
-This is the very first thing that the container process does so that subsequent operations 
+This is the very first thing that the container process does to ensure that subsequent operations
 are properly authorised by the kernel. 
 
 Creating a process with the \verb|CLONE_NEWNS| flag puts it in a new mount namespace that 
-inherits a copy of the parent's mount points. This includes the parent's root mount (at \verb|/|)
-, all pseudo filesystems and device nodes.
+inherits a copy of the parent's mount points. This includes the parent's root mount (at \verb|/|),
+which contains various \enquote{submounts} such as the pseudo filesystems \verb|/proc| and \verb|/sys|,
+the POSIX message queue filesystem \verb|/dev/mqueue| and the POSIX shared-memory filesystem \verb|/dev/shm|.
+The container runtime is responsible for setting up all of these filesystems inside the new mount namespace,
+under the base directory of the container's dedicated root filesystem. Note that upon creation,
+the container's root filesystem is a simple directory, not a mount point. 
+The runtime must convert it into a mount point so that it can replace the inherited root mount 
+with a new one. Therefore, the runtime bind mounts the aforementioned directory onto itself, using 
+the \verb|mount| system call. Recall from Section \ref{sections:fundamentals/namespaces/mount} 
+that every mount point is associated with a propagation type. If the parent mount of the 
+directory that holds the root filesystem has a shared propagation type, then bind mounting 
+that directory inside the container will propagate the mount event downstream to the parent mount, 
+causing the bind mount to appear in the set of mount points in the root mount namespace, i.e on the host.
+This is not desirable as it directly interferes with the host environment. For this reason, 
+the container process first remounts the old root filesystem with a propagation type set to \verb|MS_PRIVATE|
+so that any changes in the container's mount namespace are not propagated downstream. 
+Note that setting the propagation type to \verb|MS_SLAVE| would also work, if the container 
+wants to receive mount events from the host. This process is shown in code snippet \ref{code:implementation/namespaces/mount}.
+The variable \verb|rfs->cro_dst| holds the absolute path to the container's root filesystem.
+
+\begin{lstlisting}[style=c-code-snippets, label={code:implementation/namespaces/mount}, caption={Remounting the original root filesystem to disable mount propagation events and bind mounting the container's root filesystem onto itself.}]
+/* Error handling deliberately left out */
+mount("", "/", "", MS_PRIVATE | MS_REC, NULL);
+mount(rfs->cro_dst, rfs->cro_dst, "bind", MS_BIND | MS_REC, NULL);
+mount("", rfs->cro_dst, "", MS_PRIVATE, NULL);
+\end{lstlisting}
 
 \section{Benchmark}
 \label{ch:implementation/benchmark}

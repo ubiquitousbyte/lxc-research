@@ -348,7 +348,7 @@ already mounted subtrees visible at other locations in it. This concept is known
 on the host system to directories inside a container. Internally, the kernel copies
 the data structures of the original mount into a new mount point inside 
 container's mount namespace. Changes in one mount point are reflected in the other 
-using copy on write. 
+because they point to the same underlying data. 
 
 \subsection{Network namespace}
 \label{sections:fundamentals/namespaces/network}

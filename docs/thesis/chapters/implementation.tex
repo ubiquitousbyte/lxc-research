@@ -211,12 +211,31 @@ mount("", ".", "", MS_SLAVE | MS_REC, NULL);
 umount2(".", MNT_DETACH);
 fchdir(new_root);
 \end{lstlisting}
+The runtime overlays the old root mount on top of the new one, caching a file descriptor to the former 
+before pivoting. It then switches its current directory by using the file descriptor and unmounts
+the old root. 
 Note that setting 
 the old root filesystem's propagation type to \verb|MS_PRIVATE|, as shown on line 1 in code snippet 
-\ref{code:implementation/namespaces/mount}, is an absolute necessity before calling \verb|pivot_root|.
-Otherwise, unmounting the root filesystem may propagate downstream to the host, causing it to 
+\ref{code:implementation/namespaces/mount}, is a requirement for calling \verb|pivot_root|.
+Otherwise, unmounting the old root filesystem may propagate downstream to the host, causing it to 
 unmount as well.
-    
+
+Creating a process with the \verb|CLONE_NEWUTS| flag puts it in a new uts namespace that inherits 
+a copy of the parent's system identifiers. The runtime reacts to this by setting the container's
+hostname to a user-defined string present in the container's configuration file.
+
+The runtime does not enforce a particular network configuration for a container. This is done 
+by the container engine, or in our case, the benchmark tool. Hence, the runtime proceeds 
+to call \verb|execve|. In turn, the kernel installs a fresh virtual address space 
+for the process with the user program loaded. 
+The runtime must ensure that all auxiliary file descriptors 
+are closed before executing the program. Otherwise, these will be preserved in the file descriptor 
+table of the process and leaked to the user program.
+The most fault-tolerant way to do this is to open every file descriptor with the \verb|O_CLOEXEC|
+flag. The kernel takes care of closing the file descriptors when \verb|execve| is called. 
+Note that, for debugging purposes, the standard input-output streams are not closed and are 
+therefore inherited. 
+
 \section{Benchmark}
 \label{ch:implementation/benchmark}
 \subsection{Network workload}

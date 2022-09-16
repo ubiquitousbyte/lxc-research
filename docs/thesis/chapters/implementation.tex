@@ -100,7 +100,7 @@ a container escape proves critical.
 The mapping in (\ref{eq:implementation/root-mapping}) is the default one for containers created by the Docker engine, necessitating
 additional configurations to enable rootless containers.
 The identifier mappings of a container also have an impact on its noninterference boundary with 
-other containers. If the runtime maps the same user identifer on the host to the root user inside the user namespace of two different containers, an 
+other containers. If the runtime maps the same user identifer on the host to the root user inside the user namespaces of two different containers, an 
 attacker that escapes from one container will be able to enter the user namespace of the other. Upon entering,
 the attacker will have root privileges. Therefore, for a truly secure environment, two invariants must hold - 
 mapped identifier ranges must not overlap across different containers, and a privileged user on the host must 
@@ -174,7 +174,6 @@ mount("", rfs->cro_dst, "", MS_PRIVATE, NULL);
         \verb|random| & Random number generator gathering environmental noise from device drivers. Blocks until enough entropy is gathered. \\
         \hline
         \verb|urandom| & Random number generator gathering environmental noise from device drivers. Has nonblocking semantics \\
-
         \hline
     \end{tabular}
     \caption{Table of mounted device nodes within a container}
@@ -235,6 +234,50 @@ The most fault-tolerant way to do this is to open every file descriptor with the
 flag. The kernel takes care of closing the file descriptors when \verb|execve| is called. 
 Note that, for debugging purposes, the standard input-output streams are not closed and are 
 therefore inherited. 
+
+The runtime process and the container process need to synchronise with each other for two purposes.
+First, the runtime allows external applications to plug into well-defined points in the 
+lifecycle of a container and execute arbitrary binaries. For example, a set of hooks 
+gets executed after the container pivots into its root filesystem but before it executes the user-defined 
+binary. Hence, the container process needs to block and wait for a hook execution event from the 
+runtime. Second, the runtime 
+process must be able to receive error notifications from the container so that it knows 
+when to reap the container and what to report to the user. The kernel provides a variety of 
+inter-process communication mechanisms that can be grouped into two semantical categories - shared-memory 
+and message passing. The runtime uses the latter. In particular, the container and runtime processes 
+interact through a pair of full-duplex UNIX streaming sockets created with the \verb|socketpair()|
+system call. The runtime and the container keep one end of the socket pair open 
+and close the other end, respectively. Sockets have a natural point of synchronisation - if a 
+process attempts to read any data from the socket, it blocks until data becomes available. Continuing the 
+example above, when the container needs to execute a set of hooks before executing the user-defined 
+binary, it reads from the socket, thereby blocking until the runtime process writes some data. Similarly, if the 
+container process encounters an error, it writes a particular error message into the socket.
+When the runtime reads from the socket, it will receive the error notification and perform 
+the necessary cleanup operations. The complete summary of messages, as well as the sending and 
+receiving parties are described in Table \ref{table:implementation/runtime/socket-events}.
+
+\begin{table}[h!]
+    \centering
+    \begin{tabular}{ |m{4cm}|m{2cm}|m{2cm}|m{15em}| }
+        \hline
+        Event & Sender & Receiver & Event Description \\
+        \hline
+        \verb|EVENT_RT_CREATE| & Container & Runtime & Execute runtime creation hooks \\
+        \hline
+        \verb|EVENT_RT_CREATED| & Runtime & Container & Runtime creation hooks completed \\
+        \hline 
+        \verb|EVENT_CONT_CREATE| & Runtime & Container & Execute container creation hooks \\
+        \hline 
+        \verb|EVENT_CONT_CREATED| & Container & Runtime & Container creation hooks executed \\
+        \hline
+        \verb|EVENT_CONT_START| & Runtime & Container & Start user-defined binary \\
+        \hline 
+        \verb|EVENT_CONT_STARTED| & Runtime & Container & User-defined binary started \\
+        \hline
+    \end{tabular}
+    \caption{Table of events exchanged by the runtime and container}
+    \label{table:implementation/runtime/socket-events}
+\end{table}
 
 \section{Benchmark}
 \label{ch:implementation/benchmark}

@@ -4,12 +4,22 @@ and the benchmark tool.
 
 Section \ref{ch:implementation/runtime} dives deeply into the 
 system call interface of the Linux kernel that enables the creation and execution 
-of isolated workloads. This chapter also contains a qualitative evaluation of the runtime's 
-security characteristics. 
+of isolated workloads.
+
+Section \ref{ch:implementation/benchmark} presents the implementation of the benchmarks
+and the tool that manages them. 
 
 \label{ch:implementation}
 \section{Runtime}
 \label{ch:implementation/runtime}
+The runtime is divided into two parts - a library and an executable.
+Section \ref{ch:implementation/runtime/library} contains information about how 
+the library was implemented as well as a qualitative description of its security characteristics.
+
+Section \ref{ch:implementation/runtime/executable} shifts the focus towards the runtime executable,
+also referred to as a \textit{container shim}, and its responsibilities.
+\subsection{Library}
+\label{ch:implementation/runtime/library}
 The \verb|clone()| system call is the runtime's primary method of isolating a process.
 This system call creates a new execution context and allows the caller to configure it 
 through a bit mask. In essence, this bit mask defines the noninterference boundary between 
@@ -17,6 +27,37 @@ the new execution context, its parent, and all other processes on the system. If
 the clone system call is equivalent to a simple \verb|fork()|. The runtime utilises this 
 system call for two purposes - to spawn the container process in a new set of namespaces and to 
 create a pollable process file descriptor for it. 
+\begin{lstlisting}[style=c-code-snippets, label={code:implementation/namespaces/clone}, caption={Container instantiation within the runtime using clone3}]
+    static inline pid_t clone3(struct clone_args *args, size_t args_size)
+    {
+        return (pid_t) syscall(SYS_clone3, args, args_size);
+    }
+    
+    static int container_entrypoint(void *arg)
+    {
+        struct conty_container *cc = (struct conty_container *) arg;
+        /* Configure container within new namespace set */
+        /* At the end, call execve to load the user-defined binary */
+    }
+    
+    int conty_container_spawn(struct conty_container *cc)
+    {
+        struct clone_args args = {
+            // cc->cc_ns_new contains
+            // CLONE_NEWIPC | CLONE_NEWPID | CLONE_NEWUSER | CLONE_NEWNS | CLONE_NEWUTS | CLONE_NEWNET
+            .flags = cc->cc_ns_new | CLONE_PIDFD;
+            .pidfd = (__u64)(uintptr_t) &cc->cc_pollfd,
+        };
+    
+        cc->cc_pid = clone3(&args, CLONE_ARGS_SIZE_VER2);
+        if (cc->cc_pid == 0) 
+            /* Within container */
+            _exit(container_entrypoint(cc));
+        else 
+            /* Within runtime */
+    }
+    \end{lstlisting}
+    
 Achieving the former is trivial. The kernel exposes a flag for every namespace type.
 These flags are simply ORed together and passed into the system call. 
 Internally, the kernel allocates a new namespace proxy and all of its namespaces 
@@ -29,37 +70,6 @@ within the runtime implementation. The namespaces are parsed from the configurat
 aggregated into a bit mask \verb|cc_ns_new|. The runtime then calls out to the \verb|clone3()| system call
 with the namespace mask set, as well as a pointer to a pollable file descriptor for the 
 container that should be populated by the kernel - \verb|cc_pollfd|. 
-
-\begin{lstlisting}[style=c-code-snippets, label={code:implementation/namespaces/clone}, caption={Container instantiation within the runtime using clone3}]
-static inline pid_t clone3(struct clone_args *args, size_t args_size)
-{
-    return (pid_t) syscall(SYS_clone3, args, args_size);
-}
-
-static int container_entrypoint(void *arg)
-{
-    struct conty_container *cc = (struct conty_container *) arg;
-    /* Configure container within new namespace set */
-    /* At the end, call execve to load the user-defined binary */
-}
-
-int conty_container_spawn(struct conty_container *cc)
-{
-    struct clone_args args = {
-        // cc->cc_ns_new contains
-        // CLONE_NEWIPC | CLONE_NEWPID | CLONE_NEWUSER | CLONE_NEWNS | CLONE_NEWUTS | CLONE_NEWNET
-        .flags = cc->cc_ns_new | CLONE_PIDFD;
-        .pidfd = (__u64)(uintptr_t) &cc->cc_pollfd,
-    };
-
-    cc->cc_pid = clone3(&args, CLONE_ARGS_SIZE_VER2);
-    if (cc->cc_pid == 0) 
-        /* Within container */
-        _exit(container_entrypoint(cc));
-    else 
-        /* Within runtime */
-}
-\end{lstlisting}
 
 Spawning a process in a new set of namespaces is not enough to provide a secure runtime environment.
 As a matter of fact, the container's runtime environment after \verb|clone()| is insecure and unusable.
@@ -147,16 +157,11 @@ Instead, the kernel resorts to authorising the operation with the user credentia
 root namespace, which will always fail in the context of a rootless container. For this reason,
 the runtime falls back to bind mounting the devices from the host. 
 Axiomatically, the noninterference boundary for these devices is nonexistent. 
-The same semantics apply when trying to mount a block device inside a 
-rootless container. The block device must first be mounted within the root mount namespace, and 
-then bind mounted from within the container's mount namespace. This, however, weakens the 
-noninterference boundary. An attacker that escapes a container may interfere with other containers
-by manipulating the device's mount point.
 \begin{lstlisting}[style=c-code-snippets, label={code:implementation/namespaces/mount}, caption={Remounting the original root filesystem to disable mount propagation events and bind mounting the container's root filesystem onto itself.}]
-/* Error handling deliberately left out */
-mount("", "/", "", MS_PRIVATE | MS_REC, NULL);
-mount(rfs->cro_dst, rfs->cro_dst, "bind", MS_BIND | MS_REC, NULL);
-mount("", rfs->cro_dst, "", MS_PRIVATE, NULL);
+    /* Error handling deliberately left out */
+    mount("", "/", "", MS_PRIVATE | MS_REC, NULL);
+    mount(rfs->cro_dst, rfs->cro_dst, "bind", MS_BIND | MS_REC, NULL);
+    mount("", rfs->cro_dst, "", MS_PRIVATE, NULL);
 \end{lstlisting}
 
 \begin{table}[h!]
@@ -180,6 +185,12 @@ mount("", rfs->cro_dst, "", MS_PRIVATE, NULL);
     \label{table:implementation/runtime/devices}
 \end{table}
 
+The same semantics apply when trying to mount a block device inside a 
+rootless container. The block device must first be mounted within the root mount namespace, and 
+then bind mounted from within the container's mount namespace. This, however, weakens the 
+noninterference boundary. An attacker that escapes a container may interfere with other containers
+by manipulating the device's mount point.
+
 The \verb|proc| and \verb|sys| filesystems are mounted conditionally. The former presents information
 about all processes on the system. If the runtime is instructed to create a container with 
 its own isolated process identifier namespace, then it must mount a dedicated \verb|proc|
@@ -194,22 +205,22 @@ executable files and device nodes within these filesystems. Write permissions ar
 for all users that are not mapped to the root user within the container's user namespace. 
 After setting up all the mounts, the runtime pins the root filesystem onto the 
 root directory entry, making all filesystem entries on the host inaccessible from within the container's mount namespace.
+\begin{lstlisting}[style=c-code-snippets, label={code:implementation/namespaces/pivot}, caption={Swap the old root filesystem with a new one}]
+    /* Error handling deliberately left out */
+    int old_root = -EBADF, new_root = -EBADF;
+    new_root = openat(-EBADF, rfs->cro_dst, O_DIRECTORY | O_PATH | O_CLOEXEC | O_NOFOLLOW);
+    old_root = openat(-EBADF, "/", O_DIRECTORY | O_PATH | O_CLOEXEC | O_NOFOLLOW);
+    fchdir(new_root);
+    pivot_root(".", ".");
+    fchdir(old_root);
+    mount("", ".", "", MS_SLAVE | MS_REC, NULL);
+    umount2(".", MNT_DETACH);
+    fchdir(new_root);
+\end{lstlisting}
 This is achieved through the \verb|pivot_root| system call, which moves 
 the old root mount to a location specified by the runtime and mounts the root filesystem at \verb|/|,
 as shown in code snippet \ref{code:implementation/namespaces/pivot}.
 
-\begin{lstlisting}[style=c-code-snippets, label={code:implementation/namespaces/pivot}, caption={Swap the old root filesystem with a new one}]
-/* Error handling deliberately left out */
-int old_root = -EBADF, new_root = -EBADF;
-new_root = openat(-EBADF, rfs->cro_dst, O_DIRECTORY | O_PATH | O_CLOEXEC | O_NOFOLLOW);
-old_root = openat(-EBADF, "/", O_DIRECTORY | O_PATH | O_CLOEXEC | O_NOFOLLOW);
-fchdir(new_root);
-pivot_root(".", ".");
-fchdir(old_root);
-mount("", ".", "", MS_SLAVE | MS_REC, NULL);
-umount2(".", MNT_DETACH);
-fchdir(new_root);
-\end{lstlisting}
 The runtime overlays the old root mount on top of the new one, caching a file descriptor to the former 
 before pivoting. It then switches its current directory by using the file descriptor and unmounts
 the old root. 
@@ -237,25 +248,7 @@ therefore inherited.
 
 The runtime process and the container process need to synchronise with each other for two purposes.
 First, the runtime allows external applications to plug into well-defined points in the 
-lifecycle of a container and execute arbitrary binaries. For example, a set of hooks 
-gets executed after the container pivots into its root filesystem but before it executes the user-defined 
-binary. Hence, the container process needs to block and wait for a hook execution event from the 
-runtime. Second, the runtime 
-process must be able to receive error notifications from the container so that it knows 
-when to reap the container and what to report to the user. The kernel provides a variety of 
-inter-process communication mechanisms that can be grouped into two semantical categories - shared-memory 
-and message passing. The runtime uses the latter. In particular, the container and runtime processes 
-interact through a pair of full-duplex UNIX streaming sockets created with the \verb|socketpair()|
-system call. The runtime and the container keep one end of the socket pair open 
-and close the other end, respectively. Sockets have a natural point of synchronisation - if a 
-process attempts to read any data from the socket, it blocks until data becomes available. Continuing the 
-example above, when the container needs to execute a set of hooks before executing the user-defined 
-binary, it reads from the socket, thereby blocking until the runtime process writes some data. Similarly, if the 
-container process encounters an error, it writes a particular error message into the socket.
-When the runtime reads from the socket, it will receive the error notification and perform 
-the necessary cleanup operations. The complete summary of messages, as well as the sending and 
-receiving parties are described in Table \ref{table:implementation/runtime/socket-events}.
-
+lifecycle of a container and execute arbitrary binaries. 
 \begin{table}[h!]
     \centering
     \begin{tabular}{ |m{4cm}|m{2cm}|m{2cm}|m{15em}| }
@@ -275,9 +268,38 @@ receiving parties are described in Table \ref{table:implementation/runtime/socke
         \verb|EVENT_CONT_STARTED| & Runtime & Container & User-defined binary started \\
         \hline
     \end{tabular}
-    \caption{Table of events exchanged by the runtime and container}
+    \caption{Table of events exchanged by the runtime and the container}
     \label{table:implementation/runtime/socket-events}
 \end{table}
+
+For example, a set of hooks 
+gets executed after the container pivots into its root filesystem but before it executes the user-defined 
+binary. 
+
+Hence, the container process needs to block and wait for a hook execution event from the 
+runtime. Second, the runtime 
+process must be able to receive error notifications from the container so that it knows 
+when to reap the container and what to report to the user. The kernel provides a variety of 
+inter-process communication mechanisms that can be grouped into two semantical categories - shared-memory 
+and message passing. The runtime uses the latter. In particular, the container and runtime processes 
+interact through a pair of full-duplex UNIX streaming sockets created with the \verb|socketpair()|
+system call.
+
+The runtime and the container keep one end of the socket pair open 
+and close the other end, respectively. Sockets have a natural point of synchronisation - if a 
+process attempts to read any data from the socket, it blocks until data becomes available. Continuing the 
+example above, when the container needs to execute a set of hooks before executing the user-defined 
+binary, it reads from the socket, thereby blocking until the runtime process writes some data. Similarly, if the 
+container process encounters an error, it writes a particular error message into the socket.
+When the runtime reads from the socket, it will receive the error notification and perform 
+the necessary cleanup operations. The complete summary of messages, as well as the sending and 
+receiving parties are described in Table \ref{table:implementation/runtime/socket-events}.
+
+\subsection{Executable}
+\label{ch:implementation/runtime/executable}
+We now turn our focus onto the executable component, also referred to as a \textit{container shim}.
+The shim sits between a container engine and a container runtime library. The shim is a process 
+dedicated to managing a single container instance.
 
 \section{Benchmark}
 \label{ch:implementation/benchmark}

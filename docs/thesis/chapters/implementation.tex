@@ -28,35 +28,35 @@ the clone system call is equivalent to a simple \verb|fork()|. The runtime utili
 system call for two purposes - to spawn the container process in a new set of namespaces and to 
 create a pollable process file descriptor for it. 
 \begin{lstlisting}[style=c-code-snippets, label={code:implementation/namespaces/clone}, caption={Container instantiation within the runtime using clone3}]
-    static inline pid_t clone3(struct clone_args *args, size_t args_size)
-    {
-        return (pid_t) syscall(SYS_clone3, args, args_size);
-    }
-    
-    static int container_entrypoint(void *arg)
-    {
-        struct conty_container *cc = (struct conty_container *) arg;
-        /* Configure container within new namespace set */
-        /* At the end, call execve to load the user-defined binary */
-    }
-    
-    int conty_container_spawn(struct conty_container *cc)
-    {
-        struct clone_args args = {
-            // cc->cc_ns_new contains
-            // CLONE_NEWIPC | CLONE_NEWPID | CLONE_NEWUSER | CLONE_NEWNS | CLONE_NEWUTS | CLONE_NEWNET
-            .flags = cc->cc_ns_new | CLONE_PIDFD;
-            .pidfd = (__u64)(uintptr_t) &cc->cc_pollfd,
-        };
-    
-        cc->cc_pid = clone3(&args, CLONE_ARGS_SIZE_VER2);
-        if (cc->cc_pid == 0) 
-            /* Within container */
-            _exit(container_entrypoint(cc));
-        else 
-            /* Within runtime */
-    }
-    \end{lstlisting}
+static inline pid_t clone3(struct clone_args *args, size_t args_size)
+{
+    return (pid_t) syscall(SYS_clone3, args, args_size);
+}
+
+static int container_entrypoint(void *arg)
+{
+    struct conty_container *cc = (struct conty_container *) arg;
+    /* Configure container within new namespace set */
+    /* At the end, call execve to load the user-defined binary */
+}
+
+int conty_container_spawn(struct conty_container *cc)
+{
+    struct clone_args args = {
+        // cc->cc_ns_new contains
+        // CLONE_NEWIPC | CLONE_NEWPID | CLONE_NEWUSER | CLONE_NEWNS | CLONE_NEWUTS | CLONE_NEWNET
+        .flags = cc->cc_ns_new | CLONE_PIDFD;
+        .pidfd = (__u64)(uintptr_t) &cc->cc_pollfd,
+    };
+
+    cc->cc_pid = clone3(&args, CLONE_ARGS_SIZE_VER2);
+    if (cc->cc_pid == 0) 
+        /* Within container */
+        _exit(container_entrypoint(cc));
+    else 
+        /* Within runtime */
+}
+\end{lstlisting}
     
 Achieving the former is trivial. The kernel exposes a flag for every namespace type.
 These flags are simply ORed together and passed into the system call. 
@@ -158,10 +158,10 @@ root namespace, which will always fail in the context of a rootless container. F
 the runtime falls back to bind mounting the devices from the host. 
 Axiomatically, the noninterference boundary for these devices is nonexistent. 
 \begin{lstlisting}[style=c-code-snippets, label={code:implementation/namespaces/mount}, caption={Remounting the original root filesystem to disable mount propagation events and bind mounting the container's root filesystem onto itself.}]
-    /* Error handling deliberately left out */
-    mount("", "/", "", MS_PRIVATE | MS_REC, NULL);
-    mount(rfs->cro_dst, rfs->cro_dst, "bind", MS_BIND | MS_REC, NULL);
-    mount("", rfs->cro_dst, "", MS_PRIVATE, NULL);
+/* Error handling deliberately left out */
+mount("", "/", "", MS_PRIVATE | MS_REC, NULL);
+mount(rfs->cro_dst, rfs->cro_dst, "bind", MS_BIND | MS_REC, NULL);
+mount("", rfs->cro_dst, "", MS_PRIVATE, NULL);
 \end{lstlisting}
 
 \begin{table}[h!]
@@ -206,16 +206,16 @@ for all users that are not mapped to the root user within the container's user n
 After setting up all the mounts, the runtime pins the root filesystem onto the 
 root directory entry, making all filesystem entries on the host inaccessible from within the container's mount namespace.
 \begin{lstlisting}[style=c-code-snippets, label={code:implementation/namespaces/pivot}, caption={Swap the old root filesystem with a new one}]
-    /* Error handling deliberately left out */
-    int old_root = -EBADF, new_root = -EBADF;
-    new_root = openat(-EBADF, rfs->cro_dst, O_DIRECTORY | O_PATH | O_CLOEXEC | O_NOFOLLOW);
-    old_root = openat(-EBADF, "/", O_DIRECTORY | O_PATH | O_CLOEXEC | O_NOFOLLOW);
-    fchdir(new_root);
-    pivot_root(".", ".");
-    fchdir(old_root);
-    mount("", ".", "", MS_SLAVE | MS_REC, NULL);
-    umount2(".", MNT_DETACH);
-    fchdir(new_root);
+/* Error handling deliberately left out */
+int old_root = -EBADF, new_root = -EBADF;
+new_root = openat(-EBADF, rfs->cro_dst, O_DIRECTORY | O_PATH | O_CLOEXEC | O_NOFOLLOW);
+old_root = openat(-EBADF, "/", O_DIRECTORY | O_PATH | O_CLOEXEC | O_NOFOLLOW);
+fchdir(new_root);
+pivot_root(".", ".");
+fchdir(old_root);
+mount("", ".", "", MS_SLAVE | MS_REC, NULL);
+umount2(".", MNT_DETACH);
+fchdir(new_root);
 \end{lstlisting}
 This is achieved through the \verb|pivot_root| system call, which moves 
 the old root mount to a location specified by the runtime and mounts the root filesystem at \verb|/|,
@@ -283,9 +283,7 @@ when to reap the container and what to report to the user. The kernel provides a
 inter-process communication mechanisms that can be grouped into two semantical categories - shared-memory 
 and message passing. The runtime uses the latter. In particular, the container and runtime processes 
 interact through a pair of full-duplex UNIX streaming sockets created with the \verb|socketpair()|
-system call.
-
-The runtime and the container keep one end of the socket pair open 
+system call. The runtime and the container keep one end of the socket pair open 
 and close the other end, respectively. Sockets have a natural point of synchronisation - if a 
 process attempts to read any data from the socket, it blocks until data becomes available. Continuing the 
 example above, when the container needs to execute a set of hooks before executing the user-defined 
@@ -299,7 +297,31 @@ receiving parties are described in Table \ref{table:implementation/runtime/socke
 \label{ch:implementation/runtime/executable}
 We now turn our focus onto the executable component, also referred to as a \textit{container shim}.
 The shim sits between a container engine and a container runtime library. The shim is a process 
-dedicated to managing a single container instance.
+dedicated to managing a single container instance. It lives for the duration of the container
+and takes on the responsibility of redirecting the container's standard input-output streams 
+to log files that can be intercepted by the container engine. This functionality is beyond the scope of this work,
+albeit trivial to implement. Instead, the container inherits the input-output streams of the shim. 
+In addition, the shim is responsible for tracking 
+and updating the container's state machine, as well as propagating signals sent by the container engine to the container. 
+Both functionalities are implemented in a similar manner - 
+by registering a file descriptor with an event loop and suspending the shim's execution until 
+the file descriptor becomes active. The shim registers two file descriptors - a signal file 
+descriptor that becomes active whenever the shim receives a signal from another process, and the 
+container's pollable process file descriptor, which becomes active whenever the container process 
+terminates. The creation of the latter is done via the \verb|clone()| system call and can be seen in code snippet \ref{code:implementation/namespaces/clone}.
+The signal file descriptor is created via a dedicated system call - \verb|signalfd()| - 
+that provides an alternative way of accepting signals besides registering a signal handler 
+incapable of executing functions that are async-signal unsafe. The shim blocks all signals 
+that aren't handled according to their default dispositions and registers the signals it would 
+like to receive events on through a signal mask configured by calls to \verb|sigemptyset()|, 
+\verb|sigaddset()| and \verb|sigprocmask()|. The file descriptor is subsequently registered 
+with an event loop managed by the \verb|poll()| system call. This system call blocks 
+the active thread until a file descriptor is ready. The system call populates a bit mask 
+indicating what type of event occured. The shim is interested in a single event - \verb|POLLIN|,
+which indicates that the file descriptor is readable. In the context of the container's file descriptor,
+no data is available. This event simply indicates that the process has exited. In the context of the 
+signal file descriptor, the shim can read a structure from it that holds the requested signal and 
+afterwards propagate that signal to the container process.
 
 \section{Benchmark}
 \label{ch:implementation/benchmark}

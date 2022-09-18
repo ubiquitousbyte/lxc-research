@@ -14,26 +14,24 @@ and process protection into a privileged control program that acted as an interm
 hardware and user programs. This program was most commonly referred to as a kernel. 
 
 \section{Objectives}
-The primary objective of this thesis is to create a set of synthetic workloads and 
-measure their performance characteristics when deployed inside a sandboxed environment.
-The same workloads will also be executed natively within the standard noninterference boundary
-provided by the kernel. The measurements will be compared and evaluated in an attempt to 
-outline the relationship between noninterference, isolation and performance. 
-A command-line tool will be developed to run the workloads and generate the measurements
-so that the results are reproducible.
+The primary objective of this thesis is to conduct an experiment consisting of a set of 
+synthetic workloads that measure response times and efficiency within a sandboxed environment.
+The experiment executes the same workloads natively, within the standard noninterference boundary 
+provided by the kernel to user space programs. The differences in response times and efficiency 
+within and outside a container are used as an approximation of the overhead introduced 
+by isolating a process from its environment. The experiment is reproducible and can be executed 
+on any Linux system with a x86\_64 or arm64 compatible processing unit.
 
-A custom container runtime will be designed, implemented and used by the command-line tool
-as the primary sandboxing mechanism. The system call interface used for sandboxing 
-the workloads will be discussed. The overhead introduced by the runtime to spawn 
-a container will also be compared to the overhead associated with spawning a simple process.
+The second objective of this thesis is to design and implement a container runtime 
+that will be used by the experiment as the primary sandboxing mechanism. The runtime's 
+implementation, including the system call that it relies on, will be thoroughly discussed and its security characteristics
+will be qualitatively evaluated. 
 
 \section{Content Structure}
 Chapter \ref{ch:fundamentals} introduces the fundamental axioms, or trade-offs, in virtualisation technologies.
 These will be referred to throughout the entire document. 
 The same chapter also introduces the concept of resource namespaces - the primary abstraction 
-provided by the kernel to sandbox processes. Furthermore, the extended Berkley Packet Filter (eBPF)
-subsystem of the kernel is described, which we use to probe metrics from the kernel
-that measure workload performance.
+provided by the kernel to sandbox processes.
 
 Chapter \ref{ch:state-of-research} outlines the current state of research in operating-system 
 virtualisation, highlights the relationships between noninterference, isolation and performance, and
@@ -42,12 +40,12 @@ discusses modern architectures that try to maximise all three.
 Chapter \ref{ch:concept} provides a detailed description of the requirements and the software architecture 
 of the runtime, benchmark tool, and the workloads. The measurements to be sampled from the kernel are introduced.
 
-Chapter \ref{ch:implementation} describes the system calls used to create the sandbox environment.
-Important implementation details are also mentioned.
+Chapter \ref{ch:implementation} describes the implementation of the container runtime. Furthermore,
+the security characteristics of the kernel's resource namespacing capabilities are discussed.
 
-Chapter \ref{ch:results} shows the results of the performance measurements and highlights the 
-differences between running the workloads inside and outside a sandbox. The results are evaluated 
-and the primary performance bottlenecks are discussed.
+Chapter \ref{ch:Experiment} contains the performance evaluation experiment. First, the hardware 
+platform under test is discussed. Second, a set of hypotheses are developed and proven and/or 
+disproven with the help of the benchmark tool.  
 
 Chapter \ref{ch:conclusion} contains conclusive remarks, a brief summary of the results of the thesis
 and future work that can be done by other students in the field. 

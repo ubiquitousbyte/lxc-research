@@ -323,9 +323,39 @@ no data is available. This event simply indicates that the process has exited. I
 signal file descriptor, the shim can read a structure from it that holds the requested signal and 
 afterwards propagate that signal to the container process.
 
+The container shim provides a command-line interface to its users.
+A user is required to specify the path to the container's configuration file, an eample 
+of which is shown in code snippet \ref{code:oci-config.json}. In addition, the user must 
+give the container a unique name. Optionally, the user may specify a timeout. The timeout is used 
+by the shim to wait for the container to exit. If the timeout expires, the container is forcibly 
+killed by the shim. The shim's command line interface is shown in code snippet \ref{code:implementation/runtime/conty-runner}.
+
+\begin{lstlisting}[label={code:implementation/runtime/conty-runner}, style=bash, caption={Container shim command-line interface}]
+$ conty-runner --help
+Usage: conty-runner [OPTION...] NAME
+conty-runner -- A program that runs containers
+
+  -b, --bundle=PATH          Path to container bundle
+  -t, --timeout[=NUMBER]     Time to wait for container to exit before killing
+  -?, --help                 Give this help list
+      --usage                Give a short usage message
+  -V, --version              Print program version
+
+Mandatory or optional arguments to long options are also mandatory or optional
+for any corresponding short options.
+
+Report bugs to htw-berlin.de.
+\end{lstlisting}
+
 \section{Benchmark}
+The benchmark focuses on measuring network and filesystem latencies and throughput 
+within and outside a container, respectively. The goal is to highlight the differences
+in response time and efficiency (See Chapter \ref{ch:Experiment}).
+Here, the tools used for measurement sampling and plot generation are discussed.
+Additionally, implementation details surrounding the workloads are mentioned.
+
 \label{ch:implementation/benchmark}
 \subsection{Network workload}
+
 \subsection{Filesystem workload}
-\subsection{Processing workload}
 \subsection{Command-line interface}

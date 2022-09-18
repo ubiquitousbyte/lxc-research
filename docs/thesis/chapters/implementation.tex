@@ -382,5 +382,16 @@ To generate the plots, the file is preprocessed by a bash script that groups the
 by connection and generates a folder with files storing the preprocessed data. Afterwards, the results are fed into the 
 \verb|gnuplot| command-line program in order to generate the two-dimensinal plots shown in Section \ref{ch:experiment/network}.
 
+The TCP client and server programs must run in two different containers in order to measure 
+the isolation overhead of the network namespace abstraction. However, they cannot talk to each other 
+unless properly configured. For this reason, a hook program was developed that sets up a virtual 
+ethernet cable for both the client and server. The hook program is referenced within the 
+client and server's container configuration files, under the \verb|on_runtime_create| hooks mentioned in Table \ref{table:concept/runtime/hooks}. 
+The container runtime picks up the program and executes it when creating the containers.
+In addition, the hook program sets up a bridge device (if it does not already exist) and attaches 
+the virtual ethernet interface of the container to it. 
+The hook program configures the respective interfaces by interacting with the kernel through a 
+datagram socket. The datagram's format is governed by the netlink protocol, which is Linux-specific.
+
 \subsection{Filesystem workload}
 \subsection{Reproducibility}

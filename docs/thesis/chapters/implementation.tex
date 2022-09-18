@@ -265,7 +265,7 @@ lifecycle of a container and execute arbitrary binaries.
         \hline
         \verb|EVENT_CONT_START| & Runtime & Container & Start user-defined binary \\
         \hline 
-        \verb|EVENT_CONT_STARTED| & Runtime & Container & User-defined binary started \\
+        \verb|EVENT_CONT_STARTED| & Container & Runtime & User-defined binary started \\
         \hline
     \end{tabular}
     \caption{Table of events exchanged by the runtime and the container}
@@ -275,7 +275,6 @@ lifecycle of a container and execute arbitrary binaries.
 For example, a set of hooks 
 gets executed after the container pivots into its root filesystem but before it executes the user-defined 
 binary. 
-
 Hence, the container process needs to block and wait for a hook execution event from the 
 runtime. Second, the runtime 
 process must be able to receive error notifications from the container so that it knows 
@@ -292,6 +291,8 @@ container process encounters an error, it writes a particular error message into
 When the runtime reads from the socket, it will receive the error notification and perform 
 the necessary cleanup operations. The complete summary of messages, as well as the sending and 
 receiving parties are described in Table \ref{table:implementation/runtime/socket-events}.
+The receiving party in each of the messages always blocks until the sender writes the message
+to the underlying socket.
 
 \subsection{Executable}
 \label{ch:implementation/runtime/executable}
@@ -356,6 +357,17 @@ Additionally, implementation details surrounding the workloads are mentioned.
 
 \label{ch:implementation/benchmark}
 \subsection{Network workload}
+The network workload introduced in Section \ref{ch:concept/benchmark/net-workload} 
+was implemented with the help of the \verb|iperf3| program - a tool 
+for performing network throughput and latency measurements for TCP and UDP.
+This tool consists of two launch modes - server mode and client mode. 
+The server can be launched by specifying the \verb|-s| option and the 
+network address and port it should listen on, as shown in code snippet \ref{code:implementation/benchmark/network-workload}. 
+By default, the server listens on port $5201$. 
+\begin{lstlisting}[label={code:implementation/benchmark/network-workload}, style=bash, caption={Launching an iperf3 TCP server}]
+$ iperf3 -s 192.168.8.2
+\end{lstlisting}
+
 
 \subsection{Filesystem workload}
-\subsection{Command-line interface}
+\subsection{Reproducibility}

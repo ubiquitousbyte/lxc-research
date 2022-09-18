@@ -367,7 +367,20 @@ By default, the server listens on port $5201$.
 \begin{lstlisting}[label={code:implementation/benchmark/network-workload}, style=bash, caption={Launching an iperf3 TCP server}]
 $ iperf3 -s 192.168.8.2
 \end{lstlisting}
-
+The client is launched with the \verb|-c| option and the network address and port 
+of the server it should connect to. In addition, the user can configure the 
+number of parallel connections, the size of the buffers to be transmitted 
+when interacting with the server, and the sampling duration. Furthermore,
+the user can instruct the tool to output its measurement samples in JSON and to a file.
+\begin{lstlisting}[label={code:implementation/benchmark/network-workload}, style=bash, caption={Launching an iperf3 TCP client that connects to an iperf3 server listening on 192.168.8.2 and writes performance samples gathered for 60 seconds from 5 parallel connections into a file}]
+$ iperf3 --logfile out.iperf3 -J --parallel 5 --length 128k --time 60 -c 192.168.8.2
+\end{lstlisting}
+The client writes a total of $60 \times N$ samples, i.e one sample per second, into the file where $N$ denotes the number of 
+parallel connections. Each sample contains, amongst other things, the round-trip time measured in microseconds, the 
+number of bits transfered per second, as well as the number of retransmits encountered during the time interval. 
+To generate the plots, the file is preprocessed by a bash script that groups the aforementioned metrics
+by connection and generates a folder with files storing the preprocessed data. Afterwards, the results are fed into the 
+\verb|gnuplot| command-line program in order to generate the two-dimensinal plots shown in Section \ref{ch:experiment/network}.
 
 \subsection{Filesystem workload}
 \subsection{Reproducibility}

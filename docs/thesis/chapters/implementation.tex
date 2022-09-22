@@ -73,7 +73,7 @@ container that should be populated by the kernel - \verb|cc_pollfd|.
 
 Spawning a process in a new set of namespaces is not enough to provide a secure runtime environment.
 As a matter of fact, the container's runtime environment after \verb|clone()| is insecure and unusable.
-The runtime must configure the environment depending on the namespaces that were created.  
+The runtime must configure the environment depending on the namespaces that were created.
 
 If the runtime creates a container process with the \verb|CLONE_NEWUSER| flag set, i.e in a new user namespace,
 the kernel initialises the container's security context to an unprivileged state by setting its 
@@ -375,12 +375,19 @@ the user can instruct the tool to output its measurement samples in JSON and to 
 \begin{lstlisting}[label={code:implementation/benchmark/network-workload}, style=bash, caption={Launching an iperf3 TCP client that connects to an iperf3 server listening on 192.168.8.2 and writes performance samples gathered for 60 seconds from 5 parallel connections into a file}]
 $ iperf3 --logfile out.iperf3 -J --parallel 5 --length 128k --time 60 -c 192.168.8.2
 \end{lstlisting}
-The client writes a total of $60 \times N$ samples, i.e one sample per second, into the file where $N$ denotes the number of 
+In the above example, the client writes a total of $60 \times N$ samples, i.e one sample per second, into the file where $N$ denotes the number of 
 parallel connections. Each sample contains, amongst other things, the round-trip time measured in microseconds, the 
 number of bits transfered per second, as well as the number of retransmits encountered during the time interval. 
 To generate the plots, the file is preprocessed by a bash script that groups the aforementioned metrics
 by connection and generates a folder with files storing the preprocessed data. Afterwards, the results are fed into the 
 \verb|gnuplot| command-line program in order to generate the two-dimensinal plots shown in Section \ref{ch:experiment/network}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.5\textwidth]{images/implementation/netlink-message.jpg}
+    \caption{Netlink message format}
+    \label{images:implementation/netlink-message.jpg}
+\end{figure}
 
 The TCP client and server programs must run in two different containers in order to measure 
 the isolation overhead of the network namespace abstraction. However, they cannot talk to each other 
@@ -390,8 +397,89 @@ client and server's container configuration files, under the \verb|on_runtime_cr
 The container runtime picks up the program and executes it when creating the containers.
 In addition, the hook program sets up a bridge device (if it does not already exist) and attaches 
 the virtual ethernet interface of the container to it. 
-The hook program configures the respective interfaces by interacting with the kernel through a 
-datagram socket. The datagram's format is governed by the netlink protocol, which is Linux-specific.
+The interfaces are configured by interacting with the kernel through a datagram socket whose format 
+is dictated by the netlink protocol.
+
+The netlink protocol is based on messages that consist of a header and a payload.
+Usually, the payload is further deconstructed into a subsystem-specific header that identifies 
+a particular resource and a set of attributes that represent configurable properties of the resource.
+The hook program specficially targets the routing subsystem, which manages resources like 
+virtual network devices, their addresses and routing tables. The general message format 
+is shown in Figure \ref{images:implementation/netlink-message.jpg}. Details pertaining to the protocol itself and the messages sent 
+to setup the network infrastructure shown in Figure \ref{images:fundamentals/net-ns-veth-arch.jpg}
+are described in Section \ref{ch:appendix/netlink-protocol}. 
+
+For the sake of simplicity, the hook program was implemented in the Go programming language 
+and utilised a library that hides the underlying details of the netlink protocol.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{images/implementation/network-hook-sequence-diagram.jpg}
+    \caption{Network hook sequence diagram}
+    \label{images:implementation/network-hook-sequence-diagram.jpg}
+\end{figure}
+
+The hook's sequence of operations is shown in Figure \ref{images:implementation/network-hook-sequence-diagram.jpg}.
+Notice that the hook needs to join the network namespace of the container to setup the network 
+addresses of the virtual ethernet cable.
+This is done by obtaining a file descriptor to the respective namespace and joining it by 
+calling the \verb|setns()| system call. After the configuration is complete, the hook 
+returns back to its original namespace by employing the same mechanism. 
+The source code of this operation is shown in code snippet \ref{code:implementation/benchmark/network-hook-doer}.
+
+The runtime ensures that the hook program cannot temporally interfere with its execution environment 
+by starting a timer before executing it. If the timer expires and the hook has not completed 
+its execution, the runtime forcibly kills it. Temporal interference may occur because the runtime 
+is required to reap the hook's process identifier. This is done via the \verb|waitpid()| system call,
+which suspends the runtime's thread of execution until the hook exits. If the hook does not exit,
+it will cause a denial of service by indefinitely blocking the runtime.
+
+The network hook program requires capabilities that the container runtime does not have, namely 
+the \verb|CAP_SYS_ADMIN| and \verb|CAP_NET_ADMIN| capabilities. The latter is required 
+to configure the network for the container. The former is needed to join the network namespace 
+of the container. When the hook program is started, it inherits the capability sets of its parent,
+which are insufficient. For this reason, the program is transformed into a \textit{setuid} binary, as shown in 
+code snippet \ref{code:implementation/benchmark/network-hook-setuid}.
+When executed, the hook inherits the capability sets of the root user without elevating the privileges 
+of the runtime.
+
+\begin{lstlisting}[label={code:implementation/benchmark/network-hook-setuid}, style=bash, caption={Building the network hook, changing its ownership and transforming it into a setuid binary by setting the respective permission bit}]
+go build -o ./bin/net-hook ./cmd/network/main.go 
+sudo chmod u+x ./bin/net-hook
+sudo chown root ./bin/net-hook
+sudo chmod u+s ./bin/net-hook
+\end{lstlisting}
 
 \subsection{Filesystem workload}
-\subsection{Reproducibility}
+The filesystem workload introduced in Section \ref{ch:concept/benchmark/filesystem-workload} was 
+implemented with the help of the \verb|fio| program - a tool for simulating input-output workloads 
+and sampling performance metrics. \verb|fio| can perform input-output operations directly on 
+block devices or on files. In the former case, data is written directly to the device's
+addressable memory regions from user space. In the latter case, this is handled by the kernel.
+The first option should be handled with care, because \verb|fio| will completely overwrite 
+the device's contents. Users can configure the size of the test file with the \verb|--size| option. 
+Furthermore, the workloads can be configured to bypass the page cache with the \verb|--direct| option. 
+This makes sure that the caching mechanism does not cause any perturbations when assessing 
+disk performance. All input-output operations are directed to the underlying device, regardless 
+if the file's contents are already present in-memory. The size of the input-output buffers can be 
+configured with the \verb|--block-size| option. This option is very important, because it directly 
+impacts the latency and throughput results. Larger block sizes typically result in higher 
+throughputs, and higher latencies, whereas smaller block sizes lead to lower throughputs and 
+lower latencies. Users can also configure the I/O pattern to be employed with the \verb|--mode|
+option. When employing mixed input-output operations, the number of reads and writes are equally 
+distributed. The available patterns are listed in Table \ref{table:implementation/benchmark/filesystem-workload/io-patterns}.
+Fio populates the file with random data, which may cause perturbations during the 
+data generation process.
+To mitigate this, the program first generates the buffers and reuses 
+them. 
+This can be bypassed by specifying the \verb|--refill_buffers| option, which refills the 
+buffers before every I/O submission. 
+Fio provides two modes of submitting parallel I/O operations. 
+The most straightforward way to do so is to increase the number of parallel processes via the 
+\verb|--numjobs| option. Alternatively, when using an asynchronous I/O engine, the level of 
+parallelism can be increased by specifying the \verb|--iodepth| parameter, which regulates 
+the number of parallel I/O operations that can be submitted to the kernel via a single 
+system call. The I/O engine to use is configured via the \verb|--engine| parameter. It can be set to 
+\verb|sync| and \verb|libaio|.
+
+\subsection{Usage \& Reproducibility}

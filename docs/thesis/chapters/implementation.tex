@@ -459,7 +459,7 @@ addressable memory regions from user space. In the latter case, this is handled 
 The first option should be handled with care, because \verb|fio| will completely overwrite 
 the device's contents. Users can configure the size of the test file with the \verb|--size| option. 
 Furthermore, the workloads can be configured to bypass the page cache with the \verb|--direct| option. 
-This makes sure that the caching mechanism does not cause any perturbations when assessing 
+This makes sure that the kernel's underlying caching mechanisms do not cause any perturbations when assessing 
 disk performance. All input-output operations are directed to the underlying device, regardless 
 if the file's contents are already present in-memory. The size of the input-output buffers can be 
 configured with the \verb|--block-size| option. This option is very important, because it directly 
@@ -471,15 +471,87 @@ distributed. The available patterns are listed in Table \ref{table:implementatio
 Fio populates the file with random data, which may cause perturbations during the 
 data generation process.
 To mitigate this, the program first generates the buffers and reuses 
-them. 
+them.  
+\begin{table}[h!]
+    \centering
+    \begin{tabular}{ |m{4cm}|m{20em}| }
+        \hline
+        I/O pattern & Description \\
+        \hline
+        \verb|read| & Sequential reads \\
+        \hline 
+        \verb|write| & Sequential writes \\
+        \hline
+        \verb|randread| & Random reads \\
+        \hline
+        \verb|randwrite| & Random writes\\
+        \hline
+        \verb|readwrite| & Mixed sequential reads and writes. \\
+        \hline
+        \verb|randrw| & Mixed random reads and writes. \\
+        \hline
+    \end{tabular}
+    \caption{Table of I/O patterns made available by fio}
+    \label{table:implementation/benchmark/filesystem-workload/io-patterns}
+\end{table} 
 This can be bypassed by specifying the \verb|--refill_buffers| option, which refills the 
 buffers before every I/O submission. 
-Fio provides two modes of submitting parallel I/O operations. 
-The most straightforward way to do so is to increase the number of parallel processes via the 
+Fio provides two modes of submitting parallel I/O operations.
+The most straightforward way is to increase the number of parallel processes via the 
 \verb|--numjobs| option. Alternatively, when using an asynchronous I/O engine, the level of 
 parallelism can be increased by specifying the \verb|--iodepth| parameter, which regulates 
 the number of parallel I/O operations that can be submitted to the kernel via a single 
 system call. The I/O engine to use is configured via the \verb|--engine| parameter. It can be set to 
-\verb|sync| and \verb|libaio|.
+\verb|sync| and \verb|libaio|. The \verb|fio| command-line tool generates a JSON file containing the 
+performance samples gathered during the workload's execution. 
+To generate the plots, the command-line tool's execution is wrapped in a python script \verb|bench-fio| \cite{fio-plot} 
+that processes the generated JSON file and stores the processed outputs in a format that can be 
+interpreted by another publicly available script called \verb|fio-plot| \cite{fio-plot}
+that generates a set of plots.
 
 \subsection{Usage \& Reproducibility}
+Manually reproducing the results of this work is a tedious process. 
+Every workload that is to be wrapped in a container requires a dedicated root filesystem 
+with all dependencies preinstalled, as well as a container configuration file that correctly 
+points to the path of the container's root filesystem on the host, the path to the workload within the container,
+and to the paths of all hooks, which are also context-dependant. For this reason, 
+a semi-automated facility was developed to aid in reproducing the work. In this section,
+the steps necessary to reproduce the results are discussed.
+
+First, the repository containing the source code needs to be cloned and the container runtime 
+needs to be installed:
+\begin{lstlisting}[label={code:implementation/benchmark/runtime-install}, style=bash, caption={Building and installing the container runtime}]
+git clone https://github.com/ubiquitousbyte/lxc-research.git
+cd lxc-research/src/conty
+mkdir build
+cd build 
+cmake ../
+make --build . --target install
+\end{lstlisting}
+
+The benchmark tool's is located in \verb|src/conty/src/bench| relative to the 
+repository's root directory. All succeeding operations must be executed within that directory. 
+
+\subsubsection{Network workload}
+To execute the network workload within different network namespaces, both the client and the server 
+need a root filesystem with \verb|iperf3| preinstalled. The benchmark tool leverages another 
+container technology - Docker - to generate such a root filesystem. 
+To create the root filesystem, a custom Dockerfile was created, from wich an image was built. The generated container 
+image is then exported into a tar archive which can be extracted. Our custom container runtime 
+can use the extacted contents as a base directory for the container's root filesystem.
+In addition, the network hook discussed previously is built and the permissions that it requires 
+are setup accordingly. Furthermore, the template configuration files \verb|net-container-server-template.json|
+and \verb|net-container-client-template.json| are copied and the paths to the respective resources 
+are automatically adjusted. All of these operations are abstracted away through a Makefile, so running 
+\begin{lstlisting}[label={code:implementation/benchmark/network-install}, style=bash, caption={}]
+make install-net
+\end{lstlisting}
+should suffice.
+
+Befure running the network workload, make sure to disable docker's mandatory firewall rules 
+via:
+\begin{lstlisting}[label={code:implementation/benchmark/network-firewall}, style=bash, caption={}]
+echo 0 > /proc/sys/net/bridge/bridge-nf-call-iptables
+\end{lstlisting}
+The docker engine prevents network communication across namespace boundaries by instructing 
+the kernel to drop packets flowing through bridge devices that are not protected by a firewall 

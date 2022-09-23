@@ -3,7 +3,7 @@ build-io:
 	@docker export $(shell docker create lxc-research/fio) --output="fio.tar"
 	@mkdir -p ./rootfs/io
 	@tar -xf fio.tar -C ./rootfs/io
-	@touch ./rootfs/io/test-file
+	@touch ./rootfs/io/SanDisk_microSD_UHS-I-Container
 
 build-net:
 	@docker build -f ./Dockerfile.iperf3 . -t lxc-research/iperf3

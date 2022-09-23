@@ -3,13 +3,13 @@
         "args": [
             "bench-fio",
             "--type=file",
-            "--target=/test-file",
+            "--target=/SanDisk_microSD_UHS-I-Container",
             "--size=2G",
             "--output=/results",
             "--block-size=4k",
             "--numjobs=1",
             "--iodepth=16",
-            "--engine=sync",
+            "--engine=libaio",
             "--mode=read"
         ],
         "cwd": "/usr/local/bin"

@@ -618,7 +618,7 @@ After every edit, the workload can be run in a sandbox:
 $ conty-runner --bundle=./io-container.json ioc
 \end{lstlisting}
 Note that the \verb|--output| and \verb|--target| properties must remain the same. 
-The \verb|bench-fio| script will populate the \verb|/results| directory within the container's 
+The \verb|bench-fio| script will populate the \verb|/SanDisk_microSD_UHS-I-Container| directory within the container's 
 root filesystem with the results of every execution.
 
 The same set of operations need to be executed on the host in order to compare container and host 
@@ -649,32 +649,3 @@ $ ./fio-plot.sh ../rootfs/io/results/SanDisk_microSD_UHS-I-Container/4k ../fio-h
 ls 
 # Set of PNG files will be generated in the current directory
 \end{lstlisting}
-
-%\begin{lstlisting}[label={code:implementation/benchmark/io-plots}, style=bash, caption={}]
-%# Plot IOPS and latency as a function of the queue length for the read operation in the container 
-%$ fio-plot -i ./rootfs/io/results/test-file/4k --source "" -T "SanDisk microSD UHS-I on Pi 4 (Container)" -l -r read --output sandisk-libaio-read-queue-depth-iops-latency.png
-%# Plot IOPS and latency as a function of the number of jobs for the read operation in the container
-%$ fio-plot -i ./rootfs/io/results/test-file/4k --source "" -T "SanDisk microSD UHS-I on Pi 4 (Container)" -N -r read --output sandisk-libaio-read-numjobs-iops-latency.png
-%# Plot IOPS and latency as a function of the queue length for the write operation in the container 
-%$ fio-plot -i ./rootfs/io/results/test-file/4k --source "" -T "SanDisk microSD UHS-I on Pi 4 (Container)" -l -r write --output sandisk-libaio-write-queue-depth-iops-latency.png
-%# Plot IOPS and latency as a function of the number of jobs for the write operation in the container
-
-%$ fio-plot -i ./rootfs/io/results/test-file/4k --source "" -T "SanDisk microSD UHS-I on Pi 4 (Container)" -N -r write --output sandisk-libaio-write-num-jobs-iops-latency.png
-%# Plot IOPS and latency as a function of the queue length for the read operation on the host 
-%$ fio-plot -i ./fio-results/fio-test-file/4k --source "" -T "SanDisk microSD UHS-I on Pi 4" -l -r read --output sandisk-host-libaio-read-queue-depth-iops-latency.png
-%# Plot IOPS and latency as a function of the number of jobs for the read operation on the host 
-%$ fio-plot -i ./fio-results/fio-test-file/4k --source "" -T "SanDisk microSD UHS-I on Pi 4" -N -r read --output sandisk-host-libaio-read-numjobs-iops-latency.png
-%# Plot IOPS and latency as a function of the queue length for the write operation on the host 
-%$ fio-plot -i ./fio-results/fio-test-file/4k --source "" -T "SanDisk microSD UHS-I on Pi 4" -l -r write --output sandisk-host-libaio-write-queue-depth-iops-latency.png
-%# Plot IOPS and latency as a function of the number of jobs for the write operation on the host
-%$ fio-plot -i ./fio-results/fio-test-file/4k --source "" -T "SanDisk microSD UHS-I on Pi 4" -N -r write --output sandisk-host-libaio-write-numjobs-iops-latency.png
-
-%# Plot IOPS for host and container over time for read operation
-%$ fio-plot -i ./rootfs/io/results/SanDisk_microSD_UHS-I-Container/4k ./fio-results/SanDisk_microSD_UHS-I-Host/4k --source "" -T "IOPS comparison over time" -g -t iops -r read --output sandisk-libaio-iops-read-comparison.png
-%# Plot IOPS for host and container over time for write operation
-%$ fio-plot -i ./rootfs/io/results/SanDisk_microSD_UHS-I-Container/4k ./fio-results/SanDisk_microSD_UHS-I-Host/4k --source "" -T "IOPS comparison over time" -g -t iops -r write --output sandisk-libaio-iops-read-comparison.png
-%# Plot latency for host and container over time for read operation 
-%$ fio-plot -i ./rootfs/io/results/SanDisk_microSD_UHS-I-Container/4k ./fio-results/SanDisk_microSD_UHS-I-Host/4k --source "" -T "Latency comparison over time" -g -t lat -r read --output sandisk-libaio-latency-read-comparison.png
-%# Plot latency for host and container over time for write operation 
-%fio-plot -i ./rootfs/io/results/SanDisk_microSD_UHS-I-Container/4k ./fio-results/SanDisk_microSD_UHS-I-Host/4k --source "" -T "Latency comparison over time" -g -t lat -r write --output sandisk-libaio-latency-write-comparison.png
-%\end{lstlisting}

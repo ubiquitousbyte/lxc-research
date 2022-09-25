@@ -66,8 +66,7 @@ the access control lists of the inode are consulted before delegating.
 The ACL subsystem asseses the permissions of the process through a multitude of bitwise operations, which 
 are also constant. 
 
-Setting up the bind mount has no effect on 
-the path should not have an effect on these system calls. The overhead of that operation manifests itself
+Setting up the bind mount should not have an effect on these system calls. The overhead of that operation manifests itself
 during the container creation phase - when a duplicate view of the directory holding 
 the container's root filesystem is created under a new node in the file system hierarchy.
 
@@ -81,7 +80,58 @@ In order to test the hypothesis, the filesystem workload ran for both the read a
 operations within and outside a container. The workload's total runtime was 60 seconds.
 No concurrent operations were executed - a single process issued a single operation per unit of time. 
 During the workload's runtime, the number of successfully executed input-output operations and the total latency per second 
-were accumulated. 
+were accumulated. The results for the read and write system calls are shown in Figure \ref{ch:experiment/problem-a/test/read-iops-over-time},
+Figure \ref{ch:experiment/problem-a/test/write-iops-over-time}, Figure \ref{ch:experiment/problem-a/test/read-latency-over-time} and Figure \ref{ch:experiment/problem-a/test/write-latency-over-time}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{images/results/sandisk-libaio-iops-read-comparison.png}
+    \caption{Read IOPS on the host and inside a container, compared over time}
+    \label{ch:experiment/problem-a/test/read-iops-over-time}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{images/results/sandisk-libaio-iops-write-comparison-2.png}
+    \caption{Write IOPS on the host and inside a container, compared over time}
+    \label{ch:experiment/problem-a/test/write-iops-over-time}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{images/results/sandisk-libaio-latency-read-comparison.png}
+    \caption{Read latency on the host and inside a container, compared over time}
+    \label{ch:experiment/problem-a/test/read-latency-over-time}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{images/results/sandisk-libaio-latency-write-comparison-2.png}
+    \caption{Write latency on the host and inside a container, compared over time}
+    \label{ch:experiment/problem-a/test/write-latency-over-time}
+\end{figure}
+
+\subsection{Analysis}
+Figure \ref{ch:experiment/problem-a/test/read-iops-over-time} plots the number of read operations per second 
+within and outside a container. The orange line denotes the values accumulated on the host, whilst the blue line 
+highlights the container's accumulations. The results show that reading data through a bind mounted root filesystem 
+within a separate mount namespace has no impact on read throughput. The container handles, on average,
+8 more read operations than the host throughout the workload's lifetime. This, however, is arbitrary
+and varies across workload runs. As can be seen by the graph, the throughput achieved is nearly 
+identical during the entire workload's lifespan.
+
+Figure \ref{ch:experiment/problem-a/test/read-latency-over-time} plots the latency (in microseconds) 
+achieved within and outside a container. The graph tells a similar story. Latencies are stable and 
+do not deviate by more than $0.81$\% from an average of $0.45$ milliseconds. 
+
+Write operations exhibit higher latencies and lower throughputs.
+So much so that the difference in read and write performance is a factor of three.
+In addition, write samples deviate a lot more from their mean value compared to 
+read samples, as can be seen in Figure \ref{ch:experiment/problem-a/test/write-iops-over-time}
+and Figure \ref{ch:experiment/problem-a/test/write-latency-over-time}. The host 
+has a significant outlier in the beginning but then achieves better throughput and lower 
+latency throughout the end. The container destabilises at the end of the workload.
+In the end, however, the mean average IOPS within the container are $512$, whereas on the host 
+they are $514$ - a negligible difference. The same can be said for the latency - $1.94$ milliseconds compared to 
+$1.97$ milliseconds for the container and the host, respectively.  Hence, the hypothesis remains valid.
 
 \section{Filesystem}
 \label{ch:experiment/filesystem}

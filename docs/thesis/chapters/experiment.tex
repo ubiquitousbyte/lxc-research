@@ -1,13 +1,90 @@
 \chapter{Experiment}
 \label{ch:Experiment}
-
-\section{Environment}
 The experiment was conducted on the Raspberry Pi 4 Model B. 
 The Pi's computational capabilities are powered by a Broadcom BCM2711 chip \cite{bcm2711-arm}
 consisting of four Cortex-A72 processing cores, each having a 48 kB and 32 kB L1 instruction 
 and data cache, respectively. The local caches are connected to a central 1 MB L2 cache, which is also 
 used by an integrated VideoCore 6 GPU. The SoC interfaces with an 8 GB LPDDR4-SDRAM chip through a 
-32-bit wide bus. A 64 GB SanDisk microSD card is used for persistent storage.
+32-bit wide bus. Hence, two fetch operations are required to load a 64-bit value from memory into 
+one of the cores' registers.
+A 64 GB SanDisk UHS-1 microSD card is used for persistent storage. The card is connected 
+to the SoC through an SDIO interface. For networking, the board comes with an ethernet port and a 
+wireless networking module that is connected through an SDIO interface.
+
+A Fedora 36 server image \cite{fedora-36-server} with the 5.17.5 Linux kernel version was flashed 
+on the microSD card and installed on the Raspberry Pi. The disk partitions were resized to fully 
+incorporate the available disk space, ending up with 56 GB of disk space allocated to the logical volume 
+mounted at the root point and 7 GB of swap space. The filesystem mounted at the root point is \verb|xfs|. 
+The device was connected to a hidden local WiFi network through the \verb|nmcli| tool. The 
+ethernet port remained unused. 
+
+The device was 
+put in an aluminium case that acts as a heat-sink and dissipates the heat out of the processor. 
+In other words, the case acts as a passive cooling component that protects against potential
+performance perturbations caused by thermal trottling. 
+
+Each of the following sections introduces a question equivalent to a performance problem 
+statement and a hypothesis that tries to answer it. The hypothesis is proven or disproven based on observational data 
+gathered by running the workloads. The data is then analysed. The operational flow is similar for all 
+hypotheses. Observational data is gathered by executing the same workload within and outside 
+the container abstraction. The differences in the data points act as a proxy metric for the 
+isolation overhead of a container. 
+
+
+\section{Problem A}
+
+\subsection{Problem statement}
+
+In order to properly isolate the container's root filesystem from the host, the runtime 
+creates a dedicated mount point that binds the directory on the host to a mount point 
+in the container. The mount point has two important properties. First, it is invisible from the host. 
+Second, it atomically replaces the root mount within the mount namespace 
+of the container. Given this configuration, we can derive the following question:
+
+\textit{Does reading/writing data from the underlying device through a bind mounted root filesystem in 
+an isolated mount namespace cause an increase in latency or a decrease in throughput?}
+
+\subsection{Hypothesis}
+The two potential sources of isolation overhead are the indirection introduced by the mount namespace 
+and the bind mount. 
+
+Examining the source code of the \verb|read()| and \verb|write()| system calls 
+shows that the namespace abstraction is used once - to check if the calling process 
+has the necessary permissions to operate on the file.
+This is done by checking if there is a valid user identifier 
+mapping between the user namespace of the calling process and the owning user namespace of the 
+file. Both are accessed in constant time - by following pointers relative to the currently 
+executing process and the inode that is translated from the file descriptor, respectively.
+The inode user identifier is translated into a user identifier within the user namespace 
+of the mount namespace where the inode was found.
+This is also a constant operation, because identifiers in different user namespaces are mapped using simple 
+addition and subtraction \cite{idmappings}.
+The translated user identifier is compared
+to the user identifier of the current process and if they match, the read operation 
+is delegated to the underlying fileystem implementation - \verb|xfs|. If the identifiers do not match, 
+the access control lists of the inode are consulted before delegating. 
+The ACL subsystem asseses the permissions of the process through a multitude of bitwise operations, which 
+are also constant. 
+
+Setting up the bind mount has no effect on 
+the path should not have an effect on these system calls. The overhead of that operation manifests itself
+during the container creation phase - when a duplicate view of the directory holding 
+the container's root filesystem is created under a new node in the file system hierarchy.
+
+The argumentation above leads to the following hypothesis:
+
+\textit{Reading and writing data from a device through a bind mounted root filesystem resident in an isolated mount namespace exhibits
+the same latency and throughput characteristics as performing the equivalent operations from the device in the root mount namespace without a bind mount.}
+
+\subsection{Test}
+In order to test the hypothesis, the filesystem workload ran for both the read and write 
+operations within and outside a container. The workload's total runtime was 60 seconds.
+No concurrent operations were executed - a single process issued a single operation per unit of time. 
+During the workload's runtime, the number of successfully executed input-output operations and the total latency per second 
+were accumulated. 
+
+\section{Filesystem}
+\label{ch:experiment/filesystem}
 
 \begin{figure}[H]
     \centering

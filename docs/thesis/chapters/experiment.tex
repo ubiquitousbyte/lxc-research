@@ -73,7 +73,7 @@ the container's root filesystem is created under a new node in the file system h
 The argumentation above leads to the following hypothesis:
 
 \textit{Reading and writing data from a device through a bind mounted root filesystem resident in an isolated mount namespace exhibits
-the same latency and throughput characteristics as performing the equivalent operations from the device in the root mount namespace without a bind mount.}
+the same latency and throughput characteristics as performing the equivalent operationse in the root mount namespace without a bind mount.}
 
 \subsection{Test}
 In order to test the hypothesis, the filesystem workload ran for both the read and write 
@@ -133,6 +133,89 @@ In the end, however, the mean average IOPS within the container are $512$, where
 they are $514$ - a negligible difference. The same can be said for the latency - $1.94$ milliseconds compared to 
 $1.97$ milliseconds for the container and the host, respectively.  Hence, the hypothesis remains valid.
 
+\section{Problem B}
+\subsection{Problem statement}
+Efficiently sharing resources between different processes is one of the primary task of a kernel.
+As the number of processes utilising the same resource increases, a point of saturation may be reached. 
+This happens when the resource reaches 100\% utilisation and queuing begins to be frequent and significant.
+A natural question follows:
+
+\textit{Does scaling the number of reads/writes from/to the underlying device issued from a bind mounted 
+root filesystem in an isolated mount namespace saturate the resource faster than performing the 
+equivalent scaling without the noninterference boundary?}
+
+This question directly follows the performance axiom in Section \ref{sections:fundamentals/virtualisation/axioms/performance}.
+Does the overhead introduced by the container runtime to isolate the filesystem negatively affect 
+the ability of processes in the container to share a given resource?
+
+\subsection{Hypothesis}
+From the previous problem, we know that the difference in latency and throughput outside 
+and within the container's noninterference boundary is negligible and has no statistical significance.
+Hence, a single process is not negatively affected. Assuming that scaling the number of reads/writes 
+is done by increasing the number of processes that concurrently issue input-output operations, then 
+the point of saturation should be exactly the same as on the host.
+
+\subsection{Test}
+In order to test the hypothesis, the filesystem workload ran for both the read and write 
+operations within and outside a container. The workload's total runtime was 60 seconds.
+The number of processes was scaled $n$ times by $2^{i}$ for $i = 0\hdots n$ where $n = 6$. 
+During the workload's runtime, the number of successfully executed input-output operations and the total latency per second 
+were accumulated per process group. The test results are shown in Figure \ref{images:experiment/sandisk-host-libaio-read-numjobs-iops-latency.png},
+Figure \ref{images:experiment/sandisk-libaio-read-numjobs-iops-latency.png}, Figure \ref{images:experiment/sandisk-host-libaio-write-numjobs-iops-latency.png}
+and Figure \ref{images:experiment/sandisk-libaio-write-num-jobs-iops-latency.png}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{images/results/sandisk-host-libaio-read-numjobs-iops-latency.png}
+    \caption{Throughput and latency measurements on the host as a function of the number of concurrent processes issuing read operations.}
+    \label{images:experiment/sandisk-host-libaio-read-numjobs-iops-latency.png}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{images/results/sandisk-libaio-read-numjobs-iops-latency.png}
+    \caption{Throughput and latency measurements in a container as a function of the number of concurrent processes issuing read operations.}
+    \label{images:experiment/sandisk-libaio-read-numjobs-iops-latency.png}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{images/results/sandisk-host-libaio-write-numjobs-iops-latency.png}
+    \caption{Throughput and latency measurements on the host as a function of the number of concurrent processes issuing write operations.}
+    \label{images:experiment/sandisk-host-libaio-write-numjobs-iops-latency.png}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{images/results/sandisk-libaio-write-num-jobs-iops-latency.png}
+    \caption{Throughput and latency measurements in a container as a function of the number of concurrent processes issuing write operations.}
+    \label{images:experiment/sandisk-libaio-write-num-jobs-iops-latency.png}
+\end{figure}
+
+\subsection{Analysis}
+Every figure shows the number of concurrent processes issuing the respective operation on the 
+x-axis. The y-axis on the left side represents the number of IOPS conducted. The green bars 
+show the average number of IOPS achieved during the workload's execution. The y-axis on the right side 
+represents the latency (in microseconds) The blue bars show the average latency during the workload's execution. 
+
+Figure \ref{images:experiment/sandisk-host-libaio-read-numjobs-iops-latency.png} and 
+Figure \ref{images:experiment/sandisk-libaio-read-numjobs-iops-latency.png} show the 
+number of IOPS and the latency for the read operation on the host and in a container, respectively. 
+In both cases, the same tendency is observed. As the number of processes is increased, then 
+the number of successfully executed input-output operations increases as well.
+Similarly, latency increases as well. The best IOPS to latency ratio on the host is observed 
+when the number of concurrently running processes is $8$. The point of saturation is reached 
+at approximately $32$ concurrent processes where the IOPS to latency ratio is worse then running 
+a single process. In the container, the best ratio is observed when the number of concurrent 
+processes is $16$. Both the host and the container have the same point of saturation - at 
+$32$ processes. Hence, for reads, the hypothesis holds. However, to achieve the best 
+resource utilisation, the container needs to create twice as many processes compared to the host - 16 versus 8, respectively. 
+
+% READS: 
+% Host: 1629, 2248, 2125, 3437, 3100, 1369, -2386
+% Container: 1651, 2266, 2280, 3023, 3042, 992, -2075
+
+
 \section{Filesystem}
 \label{ch:experiment/filesystem}
 
@@ -191,7 +274,6 @@ $1.97$ milliseconds for the container and the host, respectively.  Hence, the hy
     \caption{Throughput and latency measurements witihn a container as a function of the transmission queue length holding requests for asynchronous writes.}
     \label{images:fundamentals/net-ns-veth-arch.jpg}
 \end{figure}
-
 
 \begin{figure}[H]
     \centering

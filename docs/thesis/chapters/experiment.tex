@@ -149,9 +149,9 @@ Does the overhead introduced by the container runtime to isolate the filesystem 
 the ability of processes in the container to share a given resource?
 
 \subsection{Hypothesis}
-From the previous problem, we know that the difference in latency and throughput outside 
+From the previous problem, we know that the difference in latency and throughput for a single process outside 
 and within the container's noninterference boundary is negligible and has no statistical significance.
-Hence, a single process is not negatively affected. Assuming that scaling the number of reads/writes 
+Assuming that scaling the number of reads/writes 
 is done by increasing the number of processes that concurrently issue input-output operations, then 
 the point of saturation should be exactly the same as on the host.
 
@@ -201,93 +201,39 @@ represents the latency (in microseconds) The blue bars show the average latency 
 Figure \ref{images:experiment/sandisk-host-libaio-read-numjobs-iops-latency.png} and 
 Figure \ref{images:experiment/sandisk-libaio-read-numjobs-iops-latency.png} show the 
 number of IOPS and the latency for the read operation on the host and in a container, respectively. 
-In both cases, the same tendency is observed. As the number of processes is increased, then 
-the number of successfully executed input-output operations increases as well.
-Similarly, latency increases as well. The best IOPS to latency ratio on the host is observed 
-when the number of concurrently running processes is $8$. The point of saturation is reached 
-at approximately $32$ concurrent processes where the IOPS to latency ratio is worse then running 
-a single process. In the container, the best ratio is observed when the number of concurrent 
-processes is $16$. Both the host and the container have the same point of saturation - at 
-$32$ processes. Hence, for reads, the hypothesis holds. However, to achieve the best 
-resource utilisation, the container needs to create twice as many processes compared to the host - 16 versus 8, respectively. 
+In both cases, the same tendency is observed. As the number of processes is increased, 
+the number of successfully executed input-output operations grows. The same holds for latency. 
+The best IOPS-to-latency ratio outside the container is observed when the number of concurrently 
+executing processes equals $8$. The point of saturation is reached at approximately $32$ 
+concurrent processes where the ratio is worser than running a single process. Within the container,
+the best IOPS-to-latency ratio is observed when the number of concurrent processes is $16$. 
+Both the host and the container have the same point of saturation - at $32$ processes.
+Hence, for reads, the hypothesis holds. 
+
+The same graphs are shown for the write operation in Figure \ref{images:experiment/sandisk-host-libaio-write-numjobs-iops-latency.png} and 
+Figure \ref{images:experiment/sandisk-libaio-write-num-jobs-iops-latency.png}. Latencies for 
+this operation are measured in milliseconds. The container outperforms the host 
+in terms of IOPS as the number of processes increases. The container scales, on average, 
+by $345.5$ IOPS, whereas the host scales by $339.3$. Conversely, the host 
+latency increases on average by $3.83$ milliseconds, whereas in the container the increase 
+is by $3.85$. Due to the insignificant differences, the saturation point for writes 
+is the same for the container and the host, i.e the hypothesis holds. 
 
 % READS: 
 % Host: 1629, 2248, 2125, 3437, 3100, 1369, -2386
 % Container: 1651, 2266, 2280, 3023, 3042, 992, -2075
 
+% WRITES:
+% Host: -1503, -2695, -3052, -3575, -7700, -9440, -22467,
+% Container: -1374, -1703, -3029, -3923, -6053, -9387, -22401
 
-\section{Filesystem}
-\label{ch:experiment/filesystem}
+% SCALE IOPS
+% Container: 271, 182, 498, 510, 626, -14 = 345,5
+% Host: 108, 383, 567, 245, 796, 63 = 339,3
 
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\textwidth]{images/results/sandisk-host-libaio-read-numjobs-iops-latency.png}
-    \caption{Throughput and latency measurements on the host as a function of the number of concurrent processes issuing asynchronous reads.}
-    \label{images:fundamentals/net-ns-veth-arch.jpg}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\textwidth]{images/results/sandisk-libaio-read-numjobs-iops-latency.png}
-    \caption{Throughput and latency measurements within a container as a function of the number of concurrent processes issuing asynchronous reads.}
-    \label{images:fundamentals/net-ns-veth-arch.jpg}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\textwidth]{images/results/sandisk-host-libaio-read-queue-depth-iops-latency.png}
-    \caption{Throughput and latency measurements on the host as a function of the transmission queue length holding requests for asynchronous reads.}
-    \label{images:fundamentals/net-ns-veth-arch.jpg}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\textwidth]{images/results/sandisk-libaio-read-numjobs-iops-latency.png}
-    \caption{Throughput and latency measurements within a container as a function of the transmission queue length holding requests for asynchronous reads.}
-    \label{images:fundamentals/net-ns-veth-arch.jpg}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\textwidth]{images/results/sandisk-host-libaio-write-numjobs-iops-latency.png}
-    \caption{Throughput and latency measurements on the host as a function of the number of concurrent processes issuing asynchronous writes.}
-    \label{images:fundamentals/net-ns-veth-arch.jpg}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\textwidth]{images/results/sandisk-libaio-write-num-jobs-iops-latency.png}
-    \caption{Asynchronous write latency and read throughput measured as a function of the number of concurrent processes inside a container}
-    \label{images:fundamentals/net-ns-veth-arch.jpg}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\textwidth]{images/results/sandisk-host-libaio-write-queue-depth-iops-latency.png}
-    \caption{Throughput and latency measurements on the host as a function of the transmission queue length holding requests for asynchronous writes.}
-    \label{images:fundamentals/net-ns-veth-arch.jpg}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\textwidth]{images/results/sandisk-libaio-write-queue-depth-iops-latency.png}
-    \caption{Throughput and latency measurements witihn a container as a function of the transmission queue length holding requests for asynchronous writes.}
-    \label{images:fundamentals/net-ns-veth-arch.jpg}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\textwidth]{images/results/sandisk-libaio-iops-write-comparison.png}
-    \caption{Asynchronous write throughput on the host and inside a container, compared over time}
-    \label{images:fundamentals/net-ns-veth-arch.jpg}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.8\textwidth]{images/results/sandisk-libaio-iops-read-comparison.png}
-    \caption{Asynchronous read throughput on the host and inside a container, compared over time}
-    \label{images:fundamentals/net-ns-veth-arch.jpg}
-\end{figure}
+% SCALE LAT
+% Hpst: 1.3, 0,74, 1,09, 3,74, 3,13, 13 = 3,83 
+% Container: 0,6, 1,58, 1,32, 2,64, 3,96, 13 = 3,85
 
 \section{Network}
 \label{ch:experiment/network}

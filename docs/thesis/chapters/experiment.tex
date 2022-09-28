@@ -235,47 +235,91 @@ is the same for the container and the host, i.e the hypothesis holds.
 % Hpst: 1.3, 0,74, 1,09, 3,74, 3,13, 13 = 3,83 
 % Container: 0,6, 1,58, 1,32, 2,64, 3,96, 13 = 3,85
 
-\section{Network}
-\label{ch:experiment/network}
+\section{Problem C}
+
+\subsection{Problem Statement}
+The container runtime enables communication across network namespace boundaries 
+by setting up a bridge device and attaching a virtual ethernet cable for every container to the bridge.
+The bridge forwards packets between the virtual ethernet cables of the containers.
+If the containers were to reside in the same network namespace, then their interaction would be 
+quite simple - by binding all sockets to the loopback interface. 
+This observation leads to the following question:
+
+\textit{Does reading/writing network packets through a pair of virtual ethernet 
+devices interconnected through a bridge result in higher latencies and lower throughputs 
+compared to the equivalent operations performed in the same network namespace through the loopback interface?}
+
+\subsection{Hypothesis}
+The infrastructure necessary to provide communication between different network namespaces 
+increases the number of hops required to transmit a packet from its source to its destination. 
+A packet needs to traverse three devices to reach its destination - the virtual ethernet 
+cable of the sender, the bridge, and the virtual ethernet device of the receiver. 
+Every hop naturally introduces a minor latency, which implies a degradation in throughput.
+It is important to note that the bridge is an integral part of this process. 
+Its inability to relay packets in time may be interpreted by a container's network stack 
+as an indication of congestion. In such a case, the container will reduce 
+its transmission rate, thereby causing decreases in throughput. Congestion may also lead 
+to packet loss, which is handled by asking for retransmissions of packets that have not been 
+acknowledged by the peer. Retransmissions have a negative impact on throughput, because they 
+waste bandwidth and receivers still need to wait for them. Given all of these considerations,
+we hypothesise the following:
+
+\textit{Inter-process communication through a single interface within the same network namespace 
+exhibits higher throughputs and lower latencies compared to inter-container communication through a bridge device.}
+
+\subsection{Test}
+The TCP server and TCP client were deployed in two separate containers and ran for 60 seconds. 
+The client consists of four connections that communicate with the server in parallel.
+The block size was set to 128 kB. The same server and client were deployed on the host, communicating
+with each other through the loopback interface. During their runtime, the number of retransmissions, 
+the round-trip time and the number of megabytes per second were sampled. Each of these metrics 
+were plotted as a function of the workload's execution time.
+The number of retransmissions exhibited on the host and from the client container are shown in 
+Figure \ref{images:experiment/network-host-retransmits.pdf} and Figure \ref{images:experiment/network-retransmits-container.pdf}, respectively.
+The round-trip times on theh ost and from the client container are shown in Figure \ref{images:experiment/network-host-rtt.pdf}
+and Figure \ref{images:experiment/network-rtt-container.pdf}, respectively.
+Figure \ref{images:experiment/network-host-throughput.pdf} shows the achieved throughput 
+on the host, while Figure \ref{images:experiment/network-host-throughput.pdf} shows the 
+same metric from the perspective of the client within the container.
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=1\textwidth]{images/results/network-host-retransmits.pdf}
     \caption{Number of packet retransmissions plotted over time on the host}
-    \label{ticket-builder-class}
+    \label{images:experiment/network-host-retransmits.pdf}
 \end{figure}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=1\textwidth]{images/results/network-retransmits-container.pdf}
     \caption{Number of packet retransmissions plotted over time within a container}
-    \label{ticket-builder-class}
+    \label{images:experiment/network-retransmits-container.pdf}
 \end{figure}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=1\textwidth]{images/results/network-host-rtt.pdf}
     \caption{Network latency (round-trip time) measured over time on the host}
-    \label{ticket-builder-class}
+    \label{images:experiment/network-host-rtt.pdf}
 \end{figure}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=1\textwidth]{images/results/network-rtt-container.pdf}
     \caption{Network latency (round-trip time) measured over time within a container}
-    \label{ticket-builder-class}
+    \label{images:experiment/network-rtt-container.pdf}
 \end{figure}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=1\textwidth]{images/results/network-host-throughput.pdf}
     \caption{Network throughput measured as megabits per second over time on the host}
-    \label{ticket-builder-class}
+    \label{images:experiment/network-host-throughput.pdf}
 \end{figure}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=1\textwidth]{images/results/network-throughput-container.pdf}
     \caption{Network throughput measured as megabits per second over time within a container}
-    \label{ticket-builder-class}
+    \label{images:experiment/network-throughput-container.pdf}
 \end{figure}

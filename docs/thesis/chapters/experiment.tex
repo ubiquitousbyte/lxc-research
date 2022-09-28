@@ -276,50 +276,73 @@ the round-trip time and the number of megabytes per second were sampled. Each of
 were plotted as a function of the workload's execution time.
 The number of retransmissions exhibited on the host and from the client container are shown in 
 Figure \ref{images:experiment/network-host-retransmits.pdf} and Figure \ref{images:experiment/network-retransmits-container.pdf}, respectively.
-The round-trip times on theh ost and from the client container are shown in Figure \ref{images:experiment/network-host-rtt.pdf}
+The round-trip times on the host and from the client container are shown in Figure \ref{images:experiment/network-host-rtt.pdf}
 and Figure \ref{images:experiment/network-rtt-container.pdf}, respectively.
 Figure \ref{images:experiment/network-host-throughput.pdf} shows the achieved throughput 
-on the host, while Figure \ref{images:experiment/network-host-throughput.pdf} shows the 
+on the host, while Figure \ref{images:experiment/network-throughput-container.pdf} shows the 
 same metric from the perspective of the client within the container.
+
+\subsection{Analysis}
+The total number of retransmissions on the host (29) is $2.5$ times smaller than 
+the number of retransmissions within the container (76). This has a direct impact on 
+the round-trip time measurements. In Figure  \ref{images:experiment/network-host-rtt.pdf}, we 
+can see that the maximum round-trip time on the host is approximately 500 microseconds, but usually 
+fluctuates between 150 and 350 microseconds for all connections. The maximum round-trip time 
+in the container, however, is around 800 microseconds. In addition, 
+it fluctuates in larger strides compared to the host. By examining the time axis, we can see 
+that the largest round-trip times are observed within the same time interval as the 
+highest number of retransmissions for the container. In other words, the workload execution 
+in the container suffered from packet loss, which led to an increased number of retransmissions
+and higher latencies. Figure \ref{images:experiment/network-host-throughput.pdf} shows 
+that the achieved throughput on the host was very stable. Starting at around 1.45 GB/s, 
+it slowly grew up to 1.6 GB/s. The throughput within the container environment (Figure \ref{images:experiment/network-throughput-container.pdf})
+did not increase linearly. High variances were observed with the smallest achieved throughput 
+sitting at around 1.4 GB/s. The drop in throughput happens within the same time interval 
+as the highest number of retransmissions. Hence, it is also explained by packet loss.
+Interestingly, the network infrastructure of the container managed to sustain higher 
+throughputs compared to the host in periods where retransmissions did not happen.
+However, increases in retransmissions on the host did not negatively affect throughput at all,
+potentially indicating that network communication over a single network interface is more robust 
+than multiple network stacks.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1\textwidth]{images/results/network-host-retransmits.pdf}
+    \includegraphics[width=0.8\textwidth]{images/results/network-host-retransmits.pdf}
     \caption{Number of packet retransmissions plotted over time on the host}
     \label{images:experiment/network-host-retransmits.pdf}
 \end{figure}
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1\textwidth]{images/results/network-retransmits-container.pdf}
+    \includegraphics[width=0.8\textwidth]{images/results/network-retransmits-container.pdf}
     \caption{Number of packet retransmissions plotted over time within a container}
     \label{images:experiment/network-retransmits-container.pdf}
 \end{figure}
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1\textwidth]{images/results/network-host-rtt.pdf}
+    \includegraphics[width=0.9\textwidth]{images/results/network-host-rtt.pdf}
     \caption{Network latency (round-trip time) measured over time on the host}
     \label{images:experiment/network-host-rtt.pdf}
 \end{figure}
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1\textwidth]{images/results/network-rtt-container.pdf}
+    \includegraphics[width=0.9\textwidth]{images/results/network-rtt-container.pdf}
     \caption{Network latency (round-trip time) measured over time within a container}
     \label{images:experiment/network-rtt-container.pdf}
 \end{figure}
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1\textwidth]{images/results/network-host-throughput.pdf}
-    \caption{Network throughput measured as megabits per second over time on the host}
+    \includegraphics[width=0.9\textwidth]{images/results/network-host-throughput.pdf}
+    \caption{Network throughput measured as megabytes per second over time on the host}
     \label{images:experiment/network-host-throughput.pdf}
 \end{figure}
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1\textwidth]{images/results/network-throughput-container.pdf}
-    \caption{Network throughput measured as megabits per second over time within a container}
+    \includegraphics[width=0.9\textwidth]{images/results/network-throughput-container.pdf}
+    \caption{Network throughput measured as megabytes per second over time within a container}
     \label{images:experiment/network-throughput-container.pdf}
 \end{figure}

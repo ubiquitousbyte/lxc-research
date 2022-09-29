@@ -11,7 +11,18 @@ programming model.
 
 The aforementioned issues were addressed by shifting the responsibility of resource management 
 and process protection into a privileged control program that acted as an intermediary between 
-hardware and user programs. This program was most commonly referred to as a kernel. 
+hardware and user programs. This program is most commonly referred to as a kernel.
+The centralisation of these tasks rendered the kernel an integral part of modern computing systems. 
+The kernel is an essential part of a system's trusted computing base because it acts as a 
+single point of failure for all user programs. This is a particularly important issue for 
+infrastructure providers that sell high-availability execution environments where 
+arbitrary, and therefore, untrusted applications from different tenants coexist.
+If one application tampers with the kernel, then the whole system may potentially go down. 
+Similarly, 
+applications are able to tamper with each other, despite the protection mechanisms enforced 
+by the kernel. To solve this problem, an additional level of indirection may be introduced between the tenant program
+and all other programs on the system, including the kernel, that represents an unescapable 
+execution environment, also called a virtual environment.
 
 \section{Objectives}
 The primary objective of this thesis is to conduct an experiment consisting of a set of 
@@ -24,7 +35,7 @@ on any Linux system with a x86\_64 or arm64 compatible processing unit.
 
 The second objective of this thesis is to design and implement a container runtime 
 that will be used by the experiment as the primary sandboxing mechanism. The runtime's 
-implementation, including the system call that it relies on, will be thoroughly discussed and its security characteristics
+implementation, including the system calls that it relies on, will be thoroughly discussed and its security characteristics
 will be qualitatively evaluated. 
 
 \section{Content Structure}

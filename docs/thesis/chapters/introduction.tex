@@ -22,11 +22,31 @@ Similarly,
 applications are able to tamper with each other, despite the protection mechanisms enforced 
 by the kernel. To solve this problem, an additional level of indirection may be introduced between the tenant program
 and all other programs on the system, including the kernel, that represents an unescapable 
-execution environment, also called a virtual environment.
+execution environment that constraints the tenant program to a limited set of resources.
+This concept is known as virtualisation. 
+
+Traditional virtualisation technologies emulate the hardware resources of the system 
+and multiplexe these amongst multiple isolated kernels.
+Each kernel is allocated to a particular tenant and manages that tenant's application software.
+The overhead introduced by emulating hardware proved to outweigh the benefits of securely isolating 
+tenant software. The emulation layer drastically impacted the ability to consolidate multiple applications 
+on a single server. See Chapter \ref{ch:state-of-research} for a more thorough discussion.
+
+An alternative virtualisation architecture arose in the last decade - operating-system virtualisation. 
+In this architecture, the primitives for creating isolated execution contexts are provided 
+by the operating system kernel and are assembled together by a user-space application.
+Tenant programs act as standard processes that have a restricted view of the system.
+The kernel enforces this restriction via the use of resource namespaces - a lightweight 
+layer of indirection in the kernel that associates a process with a limited set of resources 
+that it can access. Resources outside this set are deemed inaccessible by that process. 
+Namespacing is done almost throughout the entire surface of the kernel's system call interface, which 
+is the entrypoint of user-space programs for obtaining system resources. Examining the performance impact 
+of this indirection can give an approximation of the isolation overhead associated with resource namespacing. 
+Small isolation overheads act as proxies for the ability to consolidate multiple applications on a single server.
 
 \section{Objectives}
 The primary objective of this thesis is to conduct an experiment consisting of a set of 
-synthetic workloads that measure response times and efficiency within a sandboxed environment.
+synthetic workloads that measure response times and efficiency within a sandboxed environment created with the help of resource namespaces.
 The experiment executes the same workloads natively, within the standard noninterference boundary 
 provided by the kernel to user space programs. The differences in response times and efficiency 
 within and outside a container are used as an approximation of the overhead introduced 

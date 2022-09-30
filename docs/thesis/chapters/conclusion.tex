@@ -1,12 +1,39 @@
 \chapter{Conclusion}
 \label{ch:conclusion}
 The results presented in the previous chapter show that the isolation overhead 
-of process containerisation is negligible. Disk latencies and throughput measurements 
-in containers are on par with the same measurements on the host, making containers 
-favourable for tight consolidation of multiple applications on a single server.
+of process containerisation through resource namespacing is negligible. Disk latencies and throughput measurements 
+in containers are on par with the same measurements on the host.
 The networking infrastructure required to enable inter-container communication may lead to 
 packet loss, higher retransmission counts and therefore increased latencies and decreased throughput.
 Nevertheless, the average latency and throughput over the lifespan of a workload are almost
 equivalent to running the application on the host. Furthermore, it is shown that 
 hardware virtualisation mechanisms impact the resulting latencies and throughput far more 
 severely \cite{https://doi.org/10.1002/cpe.5693} \cite{8457798}.
+From a business perspective, the near-native performance of containers makes them highly 
+favourable for consolidating multiple applications on a single server. The primary 
+challenges with containers, however, lie not in performance, but rather security.
+
+Resource namespaces encapsulate a variety of kernel resources, but not all of them.
+Namespace-unaware kernel subsystems resort to authorising operations with the user identifiers 
+in the root user namespace, i.e those that were mapped by the container runtime into the container.
+Containers that share these identifiers implicitly share various in-kernel data structures 
+that may lead to interference. For example, the kernel used to (up to v5.13.19) impose per-user resource consumption 
+restrictions such as the total number of file descriptors that can be kept open by that user, the number of 
+pending signals that can be queued among all processes of that user, and the number of processes 
+that the user can spawn. If one container exhausts these limits, other containers poentially owned by a different tenant are directly affected, i.e 
+interfered with. This particular problem has been fixed in the v5.14 release by binding resource limit counters to user namespaces
+\cite{https://patchwork.kernel.org/project/linux-hardening/cover/cover.1619094428.git.legion@kernel.org/}.
+Another very important example are filesystem implementations. Filesystems associate every file 
+with a unique user identifier that is its owner. Root filesystems for containers residing on the 
+host are typically owned by a single user and group (allocated by the container engine) and are inaccessible by other users 
+to prevent tampering. Hence, to meaningfully mount such a filesystem in multiple rootless containers, 
+each container's identifier map must point to that user on the host, i.e all containers must 
+share the same user identifier. This problem has been tackled by traversing the entire directory hierarchy and changing the 
+ownership of each node to the root user within the container after the mount - an error-prone operation 
+that can take approximately 40 seconds for a large enough root filesystem \cite{https://github.com/containerd/containerd/pull/4734}.
+The problem was addressed by allowing container runtimes to change file and directory ownerships on a per-mount basis - by remapping 
+the 
+
+\cite{https://lwn.net/Articles/896255/}.
+
+Both examples show that kernel developers are actively working on supporting container software in user-space.

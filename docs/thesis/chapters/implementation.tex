@@ -405,9 +405,7 @@ Usually, the payload is further deconstructed into a subsystem-specific header t
 a particular resource and a set of attributes that represent configurable properties of the resource.
 The hook program specficially targets the routing subsystem, which manages resources like 
 virtual network devices, their addresses and routing tables. The general message format 
-is shown in Figure \ref{images:implementation/netlink-message.jpg}. Details pertaining to the protocol itself and the messages sent 
-to setup the network infrastructure shown in Figure \ref{images:fundamentals/net-ns-veth-arch.jpg}
-are described in Section \ref{ch:appendix/netlink-protocol}. 
+is shown in Figure \ref{images:implementation/netlink-message.jpg}.
 
 For the sake of simplicity, the hook program was implemented in the Go programming language 
 and utilised a library that hides the underlying details of the netlink protocol.

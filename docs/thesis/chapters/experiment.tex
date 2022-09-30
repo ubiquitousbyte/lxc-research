@@ -73,7 +73,7 @@ the container's root filesystem is created under a new node in the file system h
 The argumentation above leads to the following hypothesis:
 
 \textit{Reading and writing data from a device through a bind mounted root filesystem resident in an isolated mount namespace exhibits
-the same latency and throughput characteristics as performing the equivalent operationse in the root mount namespace without a bind mount.}
+the same latency and throughput characteristics as performing the equivalent operations in the root mount namespace without a bind mount.}
 
 \subsection{Test}
 In order to test the hypothesis, the filesystem workload ran for both the read and write 
@@ -348,4 +348,4 @@ potentially indicating that network communication over a single network interfac
 than multiple network stacks. From these observations, we can say that the hypothesis holds partially. 
 The container's network infrastructure is less robust, leading to higher retransmission rates 
 and higher latencies. However, in periods where the network does not suffer from packet loss, 
-the container infrastructure achieves better throughput than the host. 
+the container achieves better throughput than the host. 

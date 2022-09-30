@@ -1,2 +1,12 @@
 \chapter{Conclusion}
 \label{ch:conclusion}
+The results presented in the previous chapter show that the isolation overhead 
+of process containerisation is negligible. Disk latencies and throughput measurements 
+in containers are on par with the same measurements on the host, making containers 
+favourable for tight consolidation of multiple applications on a single server.
+The networking infrastructure required to enable inter-container communication may lead to 
+packet loss, higher retransmission counts and therefore increased latencies and decreased throughput.
+Nevertheless, the average latency and throughput over the lifespan of a workload are almost
+equivalent to running the application on the host. Furthermore, it is shown that 
+hardware virtualisation mechanisms impact the resulting latencies and throughput far more 
+severely \cite{https://doi.org/10.1002/cpe.5693} \cite{8457798}.

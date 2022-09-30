@@ -31,9 +31,9 @@ each container's identifier map must point to that user on the host, i.e all con
 share the same user identifier. This problem has been tackled by traversing the entire directory hierarchy and changing the 
 ownership of each node to the root user within the container after the mount - an error-prone operation 
 that can take approximately 40 seconds for a large enough root filesystem \cite{https://github.com/containerd/containerd/pull/4734}.
-The problem was addressed by allowing container runtimes to change file and directory ownerships on a per-mount basis - by remapping 
-the 
-
-\cite{https://lwn.net/Articles/896255/}.
+Not only is this operation slow, but it affects the ownership values on the host system, thereby necessitating that 
+containers with different identifier mappings must have a dedicated copy of their root filesystem, which wastes storage.
+This is the primary reason that rootless containers have not gain widespread adoption.
+The problem was addressed in v5.12 by allowing user-space processes to associate an identifier mapping with every mount point \cite{https://lwn.net/Articles/896255/}.
 
 Both examples show that kernel developers are actively working on supporting container software in user-space.

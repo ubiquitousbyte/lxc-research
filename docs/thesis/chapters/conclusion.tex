@@ -13,6 +13,7 @@ From a business perspective, the near-native performance of containers makes the
 favourable for consolidating multiple applications on a single server. The primary 
 challenges with containers, however, lie not in performance, but rather security.
 
+\section{Discussion}
 Resource namespaces encapsulate a variety of kernel resources, but not all of them.
 Namespace-unaware kernel subsystems resort to authorising operations with the user identifiers 
 in the root user namespace, i.e those that were mapped by the container runtime into the container.
@@ -33,7 +34,28 @@ ownership of each node to the root user within the container after the mount - a
 that can take approximately 40 seconds for a large enough root filesystem \cite{https://github.com/containerd/containerd/pull/4734}.
 Not only is this operation slow, but it affects the ownership values on the host system, thereby necessitating that 
 containers with different identifier mappings must have a dedicated copy of their root filesystem, which wastes storage.
-This is the primary reason that rootless containers have not gain widespread adoption.
-The problem was addressed in v5.12 by allowing user-space processes to associate an identifier mapping with every mount point \cite{https://lwn.net/Articles/896255/}.
+This is the primary reason that rootless containers have not gained widespread adoption.
+The problem was addressed in v5.12 by allowing user-space processes to associate an identifier mapping with every mount point \cite{https://lwn.net/Articles/896255/} through 
+a new system call \verb|mount_setattr()|.
+This identifier mapping is used to translate the caller's user identifier to the filesystem user identifier in a 
+localised way \cite{https://www.kernel.org/doc/html/latest/filesystems/idmappings.html}.
+In general, both examples above show that kernel developers are actively working on hardening 
+the noninterference boundary and supporting container software in user-space.
 
-Both examples show that kernel developers are actively working on supporting container software in user-space.
+\section{Future work}
+This work can be further improved in two areas - the implementation of the container runtime 
+and the benchmarking tool. The former is discussed first. 
+The current implementation of the runtime does not incorporate the kernel's capability
+framework, which allows for fine-grained control over the container's capability sets.
+Another unsupported (and very important) feature
+is resource control groups, also referred to as \textit{cgroups}. Resource control groups 
+are a feature in the kernel that primarily deals with temporal noninterference. It is responsible 
+for restricting the usage of various resources, such as processing units, memory and disk
+to prevent denial of service attacks. Properly configuring control groups without degrading
+application performance is a nuanced challenge that, in the 
+authors opinion, is an interesting topic for a thesis.
+Another innovative technology in the kernel is the eBPF subsystem, which allows 
+for user-space programs to safely inject source code into arbitrary points in the kernel
+and sample data. This technology can be integrated within the runtime, e.g for sampling 
+behavior data of containerised processes and acting upon it, e.g if malicious intents are detected. 
+The benchmark tool can also utilise eBPF for creating custom performance statistics.

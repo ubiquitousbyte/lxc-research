@@ -1,0 +1,15 @@
+\chapter*{Abstract}
+Linux containers are the de-facto technology underlying 
+modern application sandboxing and orchestration. This work focuses 
+on analysing the primary isolation abstraction that makes 
+containers possible - resource namespaces - and to qualitatively examine their security characteristics
+by developing a proof-of-concept container runtime that supports rootless containers. 
+Implementation details are provided and the system call interface is discussed.
+In addition, the isolation overhead 
+of the runtime with respect to networking and filesystem I/O is quantified and presented.
+The results show that containers achieve native performance when interacting with 
+disk devices, but may suffer from decreased throughput and increased lantencies due to increased variance 
+and packet loss when interacting with each other from different network namespaces over a bridge device.
+\\
+\\
+\textbf{Keywords:} Linux, Namespaces, Containers, System calls, Isolation, Performance

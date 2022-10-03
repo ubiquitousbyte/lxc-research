@@ -167,3 +167,10 @@
 		\unskip\leaders\hbox to 2.9mm{\hss.}\hfill##5}%
 	\renewcommand*{\glsgroupskip}{}%
 }
+
+\def\blankpage{%
+      \clearpage%
+      \thispagestyle{empty}%
+      \addtocounter{page}{-1}%
+      \null%
+      \clearpage}
